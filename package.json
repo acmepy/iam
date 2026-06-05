@@ -1,0 +1,24 @@
+{
+  "name": "iam",
+  "version": "0.1.0",
+  "description": "Small IAM authentication, authorization, and session library for JavaScript.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./adapters": "./src/adapters/index.js",
+    "./express": "./src/express/index.js",
+    "./browser": "./src/browser/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "keywords": [
+    "iam",
+    "rbac",
+    "auth",
+    "authorization",
+    "sessions"
+  ],
+  "license": "MIT"
+}

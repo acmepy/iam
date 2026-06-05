@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { /*Auth, */createAuth, MemoryAdapter, RBAC, SessionInactiveError } from "../src/index.js";
+import { MemoryAdapter, RBAC, SessionInactiveError } from "../src/index.js";
+import { createAuth } from "../src/express/index.js";
 
 function createAdapter() {
   return new MemoryAdapter({
@@ -30,8 +31,6 @@ function createAdapter() {
 }
 
 test("Auth login returns a public session", async () => {
-  //const adapter = createAdapter();
-  //const auth = new Auth({ adapter });
   const auth = createAuth(createAdapter());
   const session = await auth.login({
     username: "admin",
@@ -51,8 +50,6 @@ test("Auth login returns a public session", async () => {
 });
 
 test("Auth logout deactivates a session", async () => {
-  //const adapter = createAdapter();
-  //const auth = new Auth({ adapter });
   const auth = createAuth(createAdapter());
   const session = await auth.login({ username: "admin", password: "1234" });
 

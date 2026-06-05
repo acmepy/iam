@@ -1,10 +1,10 @@
-import { createSessionId, ensureAdapter, now, publicSession, publicUser } from "./utils.js";
+import { createSessionId, ensureAdapter, now, publicSession, publicUser } from "../core/utils.js";
 import {
   AuthError,
   AuthRequiredError,
   SessionRequiredError,
   SessionInactiveError,
-} from "./errors.js";
+} from "../core/errors.js";
 
 export class Auth {
   constructor({ adapter, rbac } = {}) {

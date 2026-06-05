@@ -1,4 +1,3 @@
-import { Auth } from "../core/Auth.js";
 import { RBAC } from "../core/RBAC.js";
 import {
   AdapterError,
@@ -8,6 +7,7 @@ import {
   ValidationError
 } from "../core/errors.js";
 import { publicUser } from "../core/utils.js";
+import { Auth } from "./AuthService.js";
 import { setContext } from "./context.js";
 import { verifyJwt } from "./jwt.js";
 

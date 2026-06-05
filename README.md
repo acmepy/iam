@@ -2,7 +2,7 @@
 
 Small IAM authentication, authorization, and session library for JavaScript.
 
-`iam` provides a lightweight core for login/logout, session validation, role-based access control, browser helpers, Express middleware, and pluggable persistence adapters.
+`iam` provides portable role-based access control primitives, server-side authentication helpers, browser clients, Express middleware, and pluggable persistence adapters.
 
 ## Installation
 
@@ -13,7 +13,8 @@ npm install iam
 ## Quick Start
 
 ```js
-import { createAuth, MemoryAdapter, RBAC } from "iam";
+import { MemoryAdapter, RBAC } from "iam";
+import { createAuth } from "iam/express";
 
 const adapter = new MemoryAdapter({
   users: [
@@ -46,12 +47,13 @@ const rbac = new RBAC({ adapter });
 console.log(await rbac.can("admin", "users.list")); // true
 ```
 
-## Core API
+## Server Auth API
 
 ### Auth
 
 ```js
-import { Auth, MemoryAdapter } from "iam";
+import { MemoryAdapter } from "iam";
+import { Auth } from "iam/express";
 
 const auth = new Auth({ adapter: new MemoryAdapter() });
 ```
@@ -118,7 +120,8 @@ Adapters are responsible for user lookup, password verification, session persist
 ## Exports
 
 ```js
-import { Auth, RBAC, MemoryAdapter, createAuth } from "iam";
+import { RBAC, MemoryAdapter } from "iam";
+import { Auth, createAuth } from "iam/express";
 import { MemoryAdapter } from "iam/adapters";
 import { auth, can, signJwt, verifyJwt } from "iam/express";
 import { auth, can } from "iam/browser";

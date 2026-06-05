@@ -71,7 +71,7 @@ export class NotFoundError extends RbacError {
 }
 
 export class AdapterError extends RbacError {
-  constructor(message = "Error en adapter", errors = {}) {
+  constructor(message = "Adapter requerido", errors = {}) {
     super(message, 500, "ADAPTER_ERROR", errors);
   }
 }

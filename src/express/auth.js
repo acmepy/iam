@@ -15,7 +15,7 @@ export function auth(options = {}) {
   const { adapter, secret } = options;
 
   if (!adapter) {
-    throw new AdapterError("Adapter requerido");
+    throw new AdapterError();
   }
 
   const rbac = new RBAC({ adapter });
@@ -81,7 +81,7 @@ async function authenticateJwt({ header, secret, authCore }) {
     throw new TokenRequiredError();
   }
 
-  const payload = verifyJwt(token, secret);
+  const payload = await verifyJwt(token, secret);
   const sessionId = payload.sessionId ?? payload.id;
 
   if (!sessionId) {

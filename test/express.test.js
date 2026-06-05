@@ -41,7 +41,7 @@ function createAdapter() {
 
 test("express auth accepts jwt bearer tokens", async () => {
   const secret = "secret";
-  const token = signJwt({ sessionId: "session-1" }, secret);
+  const token = await signJwt({ sessionId: "session-1" }, secret);
   const req = {
     headers: {
       authorization: `Bearer ${token}`

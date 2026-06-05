@@ -1,6 +1,6 @@
 {
   "name": "iam",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Small IAM authentication, authorization, and session library for JavaScript.",
   "type": "module",
   "main": "./src/index.js",
@@ -20,5 +20,8 @@
     "authorization",
     "sessions"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "jose": "^6.2.3"
+  }
 }

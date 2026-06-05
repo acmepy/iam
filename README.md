@@ -106,6 +106,38 @@ The `auth` middleware supports:
 - Basic auth with `auth({ strategy: "basic", adapter })`.
 - Automatic strategy detection with `auth({ adapter, secret })`.
 
+## Browser Client
+
+```js
+import { auth, can } from "iam/browser";
+
+auth.configure({
+  baseUrl: "https://api.example.com",
+  storageKey: "iam.session"
+});
+
+const session = await auth.login({
+  username: "admin",
+  password: "1234",
+  options: { empresa: 1 }
+});
+
+console.log(session.user.id); // admin
+
+if (await can("users.list")) {
+  // Show or enable the users list UI.
+}
+
+await auth.logout();
+```
+
+The browser client expects the server to expose:
+
+- `POST /login` for username/password login.
+- `POST /logout` for session logout.
+- `GET /session` for bearer token login.
+- `GET /can/:permission` for permission checks when permissions are not embedded in the session.
+
 ## Adapters
 
 Available adapters:

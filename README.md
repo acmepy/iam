@@ -1,16 +1,16 @@
 # iam
 
-Small IAM authentication, authorization, and session library for JavaScript.
+IAM es una pequeña biblioteca para autenticación, autorización y gestión de sesiones en JavaScript.
 
-`iam` provides portable role-based access control primitives, server-side authentication helpers, browser clients, Express middleware, and pluggable persistence adapters.
+`iam` ofrece controles de acceso basado en roles, helpers de autenticación para servidor, clientes para navegador, middleware para Express y adaptadores de persistencia enchufables.
 
-## Installation
+## Instalación
 
 ```sh
 npm install iam
 ```
 
-## Quick Start
+## Inicio rápido
 
 ```js
 import { MemoryAdapter, RBAC } from "iam";
@@ -47,7 +47,7 @@ const rbac = new RBAC({ adapter });
 console.log(await rbac.can("admin", "users.list")); // true
 ```
 
-## Server Auth API
+## API de autenticación del servidor
 
 ### Auth
 
@@ -58,13 +58,13 @@ import { Auth } from "iam/express";
 const auth = new Auth({ adapter: new MemoryAdapter() });
 ```
 
-Main methods:
+Métodos principales:
 
-- `login({ username, password, options })`: validates credentials and creates a public session.
-- `logout(sessionId)`: deactivates a session.
-- `getSession(sessionId)`: returns an active public session.
-- `createSession({ userId, token, options })`: creates a session directly.
-- `createTemporarySession(user, options)`: creates a non-persisted public session shape.
+- `login({ username, password, options })`: valida credenciales y crea una sesión pública.
+- `logout(sessionId)`: desactiva una sesión.
+- `getSession(sessionId)`: devuelve una sesión pública activa.
+- `createSession({ userId, token, options })`: crea una sesión directamente.
+- `createTemporarySession(user, options)`: crea una sesión temporal que no se persiste.
 
 ### RBAC
 
@@ -77,7 +77,7 @@ await rbac.hasRole("admin", "admin");
 await rbac.can("admin", "users.list");
 ```
 
-## Express Middleware
+## Middleware para Express
 
 ```js
 import express from "express";
@@ -100,13 +100,13 @@ app.get(
 const token = await signJwt({ sessionId: "session-id" }, secret);
 ```
 
-The `auth` middleware supports:
+`auth` admite:
 
-- JWT bearer tokens with `auth({ strategy: "jwt", secret, adapter })`.
-- Basic auth with `auth({ strategy: "basic", adapter })`.
-- Automatic strategy detection with `auth({ adapter, secret })`.
+- Tokens bearer JWT con `auth({ strategy: "jwt", secret, adapter })`.
+- Autenticación básica con `auth({ strategy: "basic", adapter })`.
+- Detección automática de estrategia con `auth({ adapter, secret })`.
 
-## Browser Client
+## Cliente para navegador
 
 ```js
 import { auth, can } from "iam/browser";
@@ -125,31 +125,31 @@ const session = await auth.login({
 console.log(session.user.id); // admin
 
 if (await can("users.list")) {
-  // Show or enable the users list UI.
+  // Muestra o habilita la interfaz para listar usuarios.
 }
 
 await auth.logout();
 ```
 
-The browser client expects the server to expose:
+El cliente del navegador espera que el servidor exponga:
 
-- `POST /login` for username/password login.
-- `POST /logout` for session logout.
-- `GET /session` for bearer token login.
-- `GET /can/:permission` for permission checks when permissions are not embedded in the session.
+- `POST /login` para login con usuario y contraseña.
+- `POST /logout` para cerrar sesión.
+- `GET /session` para login con token bearer.
+- `GET /can/:permission` para verificar permisos cuando no están embebidos en la sesión.
 
-## Adapters
+## Adaptadores
 
-Available adapters:
+Adaptadores disponibles:
 
 - `MemoryAdapter`
 - `LocalStorageAdapter`
 - `IndexedDBAdapter`
 - `SequelizeAdapter`
 
-Adapters are responsible for user lookup, password verification, session persistence, role lookup, and permission lookup.
+Los adaptadores se encargan de la búsqueda de usuarios, verificación de contraseñas, persistencia de sesiones, búsqueda de roles y búsqueda de permisos.
 
-## Exports
+## Exportaciones
 
 ```js
 import { RBAC, MemoryAdapter } from "iam";
@@ -159,12 +159,12 @@ import { auth, can, signJwt, verifyJwt } from "iam/express";
 import { auth, can } from "iam/browser";
 ```
 
-## Testing
+## Pruebas
 
 ```sh
 npm test
 ```
 
-## License
+## Licencia
 
 MIT

@@ -1,25 +1,14 @@
 import { now } from "../core/utils.js";
 
-const collections = [
-  "users",
-  "roles",
-  "permissions",
-  "userRoles",
-  "rolePermissions",
-  "sessions"
-];
+const collections = ["users", "roles", "permissions", "userRoles", "rolePermissions", "sessions"];
 
 export class MemoryAdapter {
   constructor(data = {}) {
-    for (const name of collections) {
-      this[name] = [...(data[name] ?? [])];
-    }
+    for (const name of collections) this[name] = [...(data[name] ?? [])];
   }
 
   async findUserByUsername(username) {
-    return this.users.find((user) => {
-      return user.id === username || user.email === username || user.name === username;
-    }) ?? null;
+    return this.users.find((user) => {return user.id === username || user.email === username || user.name === username}) ?? null;
   }
 
   async findUserById(id) {
@@ -44,18 +33,12 @@ export class MemoryAdapter {
   }
 
   async findActiveSessionByUserId(userId) {
-    return this.sessions.find((session) => {
-      return session.userId === userId && session.active !== false;
-    }) ?? null;
+    return this.sessions.find((session) => {return session.userId === userId && session.active !== false}) ?? null;
   }
 
   async deactivateSession(id) {
     const session = await this.findSessionById(id);
-
-    if (!session) {
-      return null;
-    }
-
+    if (!session) return null;
     session.active = false;
     session.updatedAt = now();
     return session;
@@ -63,34 +46,20 @@ export class MemoryAdapter {
 
   async updateSession(id, values) {
     const session = await this.findSessionById(id);
-
-    if (!session) {
-      return null;
-    }
-
+    if (!session) return null;
     Object.assign(session, values, { updatedAt: now() });
     return session;
   }
 
   async findRolesByUserId(userId) {
-    const roleIds = this.userRoles
-      .filter((userRole) => userRole.userId === userId && userRole.active !== false)
-      .map((userRole) => userRole.roleId);
-
+    const roleIds = this.userRoles.filter((userRole) => userRole.userId === userId && userRole.active !== false).map((userRole) => userRole.roleId);
     return this.roles.filter((role) => roleIds.includes(role.id) && role.active !== false);
   }
 
   async findPermissionsByUserId(userId) {
     const roles = await this.findRolesByUserId(userId);
     const roleIds = roles.map((role) => role.id);
-    const permissionIds = this.rolePermissions
-      .filter((rolePermission) => {
-        return roleIds.includes(rolePermission.roleId) && rolePermission.active !== false;
-      })
-      .map((rolePermission) => rolePermission.permissionId);
-
-    return this.permissions.filter((permission) => {
-      return permissionIds.includes(permission.id) && permission.active !== false;
-    });
+    const permissionIds = this.rolePermissions.filter((rolePermission) => {return roleIds.includes(rolePermission.roleId) && rolePermission.active !== false}).map((rolePermission) => rolePermission.permissionId);
+    return this.permissions.filter((permission) => {return permissionIds.includes(permission.id) && permission.active !== false;});
   }
 }

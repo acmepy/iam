@@ -1,16 +1,17 @@
+import { DataTypes, Op } from "seq";
 import { AdapterError } from "../core/errors.js";
 import { createSessionId, now } from "../core/utils.js";
 import { defineIamModels } from "./models/iamModels.js";
 
-export class SequelizeAdapter {
-  constructor({ sequelize, models } = {}) {
-    if (!sequelize && !models) throw new AdapterError("Sequelize o models son requeridos");
-    this.sequelize = sequelize;
-    this.models = models ?? defineIamModels({define: sequelize.define.bind(sequelize), DataTypes: sequelize.Sequelize.DataTypes});
+export class SeqAdapter {
+  constructor({ seq, models } = {}) {
+    if (!seq && !models) throw new AdapterError("Seq o models son requeridos");
+    this.seq = seq;
+    this.models = models ?? defineIamModels({define: seq.define.bind(seq), DataTypes});
   }
 
   async findUserByUsername(username) {
-    return normalize(await this.models.User.findOne({where: {[this.opOr()]: [{ id: username }, { email: username }, { name: username }]}}));
+    return normalize(await this.models.User.findOne({where: {[Op.or]: [{ id: username },{ email: username },{ name: username }]}}));
   }
 
   async findUserById(id) {
@@ -23,7 +24,7 @@ export class SequelizeAdapter {
   }
 
   async createSession(session) {
-    const values = { id: session.id ?? createSessionId(), ...session};
+    const values = {id: session.id ?? createSessionId(), ...session};
 
     return normalize(await this.models.Session.create(values));
   }
@@ -56,9 +57,9 @@ export class SequelizeAdapter {
 
   async findRolesByUserId(userId) {
     const userRoles = await this.models.UserRole.findAll({where: { userId, active: true }});
-    const roleIds = userRoles.map((item) => item.roleId);
+    const roleIds = userRoles.map((item) => item.getDataValue("roleId"));
     if (roleIds.length === 0) return [];
-    const roles = await this.models.Role.findAll({where: { id: roleIds, active: true}});
+    const roles = await this.models.Role.findAll({where: {id: { [Op.in]: roleIds },active: true}});
     return roles.map(normalize);
   }
 
@@ -66,20 +67,15 @@ export class SequelizeAdapter {
     const roles = await this.findRolesByUserId(userId);
     const roleIds = roles.map((role) => role.id);
     if (roleIds.length === 0) return [];
-    const rolePermissions = await this.models.RolePermission.findAll({where: {roleId: roleIds, active: true}});
-    const permissionIds = rolePermissions.map((item) => item.permissionId);
+    const rolePermissions = await this.models.RolePermission.findAll({where: {roleId: { [Op.in]: roleIds },active: true}});
+    const permissionIds = rolePermissions.map((item) => item.getDataValue("permissionId"));
     if (permissionIds.length === 0) return [];
-    const permissions = await this.models.Permission.findAll({where: {id: permissionIds, active: true}});
+    const permissions = await this.models.Permission.findAll({where: {id: { [Op.in]: permissionIds }, active: true}});
     return permissions.map(normalize);
-  }
-
-  opOr() {
-    return this.sequelize?.Sequelize?.Op?.or ?? "or";
   }
 }
 
 function normalize(model) {
-  if (!model) return null;
-  return typeof model.get === "function" ? model.get({ plain: true }) : model;
+  if (!model)  return null;
+  return typeof model.get === "function" ? model.get() : model;
 }
-

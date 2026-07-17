@@ -1,24 +1,12 @@
 import { AdapterError } from "../core/errors.js";
 import { MemoryAdapter } from "./MemoryAdapter.js";
 
-const collections = [
-  "users",
-  "roles",
-  "permissions",
-  "userRoles",
-  "rolePermissions",
-  "sessions"
-];
+const collections = ["users", "roles", "permissions", "userRoles", "rolePermissions", "sessions"];
 const defaultDbName = "iam";
 const defaultStoreName = "collections";
 
 export class IndexedDBAdapter extends MemoryAdapter {
-  constructor({
-    indexedDB = globalThis.indexedDB,
-    dbName = defaultDbName,
-    storeName = defaultStoreName,
-    data = {}
-  } = {}) {
+  constructor({indexedDB = globalThis.indexedDB, dbName = defaultDbName, storeName = defaultStoreName, data = {} } = {}) {
     super(data);
     this.indexedDB = indexedDB;
     this.dbName = dbName;
@@ -36,19 +24,12 @@ export class IndexedDBAdapter extends MemoryAdapter {
     const transaction = db.transaction(this.storeName, "readonly");
     const done = transactionToPromise(transaction);
     const store = transaction.objectStore(this.storeName);
-    const requests = collections.map((name) => {
-      return {
-        name,
-        request: store.get(name)
-      };
-    });
-
+    const requests = collections.map((name) => { return {name, request: store.get(name)}});
     for (const item of requests) {
       const value = await requestToPromise(item.request);
       const name = item.name;
       this[name] = [...(value?.items ?? this[name] ?? [])];
     }
-
     await done;
     return this;
   }
@@ -58,11 +39,7 @@ export class IndexedDBAdapter extends MemoryAdapter {
     const transaction = db.transaction(this.storeName, "readwrite");
     const done = transactionToPromise(transaction);
     const store = transaction.objectStore(this.storeName);
-
-    for (const name of collections) {
-      store.put({ name, items: this[name] }, name);
-    }
-
+    for (const name of collections) store.put({ name, items: this[name] }, name);
     await done;
     return this;
   }
@@ -86,24 +63,13 @@ export class IndexedDBAdapter extends MemoryAdapter {
   }
 
   async open() {
-    if (!this.indexedDB) {
-      throw new AdapterError("IndexedDB no está disponible");
-    }
-
-    if (this.db) {
-      return this.db;
-    }
-
+    if (!this.indexedDB) throw new AdapterError("IndexedDB no está disponible");
+    if (this.db) return this.db;
     const request = this.indexedDB.open(this.dbName, 1);
-
     request.onupgradeneeded = () => {
       const db = request.result;
-
-      if (!db.objectStoreNames.contains(this.storeName)) {
-        db.createObjectStore(this.storeName);
-      }
+      if (!db.objectStoreNames.contains(this.storeName)) db.createObjectStore(this.storeName);
     };
-
     this.db = await requestToPromise(request);
     return this.db;
   }

@@ -146,15 +146,51 @@ Adaptadores disponibles:
 - `LocalStorageAdapter`
 - `IndexedDBAdapter`
 - `SequelizeAdapter`
+- `SeqAdapter`
 
 Los adaptadores se encargan de la búsqueda de usuarios, verificación de contraseñas, persistencia de sesiones, búsqueda de roles y búsqueda de permisos.
+
+### SeqAdapter
+
+`SeqAdapter` permite usar [`seq`](https://github.com/acmepy/seq) como motor de persistencia. Para SQLite se requiere instalar también `better-sqlite3`.
+
+```js
+import { Seq, SQLiteAdapter } from "seq";
+import { SeqAdapter } from "iam/adapters";
+import { Auth } from "iam/express";
+
+const sqlite = new SQLiteAdapter({ database: ":memory:" });
+const seq = new Seq({ adapter: sqlite, logging: false });
+const adapter = new SeqAdapter({ seq });
+
+await seq.init();
+await seq.sync();
+
+await adapter.models.User.create({
+  id: "admin",
+  password: "1234",
+  name: "Administrador",
+  email: "admin@app.com",
+  options: {},
+  active: true
+});
+
+const auth = new Auth({ adapter });
+const session = await auth.login({
+  username: "admin",
+  password: "1234",
+  options: { empresa: 1 }
+});
+
+console.log(session.user.id); // admin
+```
 
 ## Exportaciones
 
 ```js
 import { RBAC, MemoryAdapter } from "iam";
 import { Auth, createAuth } from "iam/express";
-import { MemoryAdapter } from "iam/adapters";
+import { MemoryAdapter, SeqAdapter } from "iam/adapters";
 import { auth, can, signJwt, verifyJwt } from "iam/express";
 import { auth, can } from "iam/browser";
 ```

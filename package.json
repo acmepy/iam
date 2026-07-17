@@ -1,6 +1,6 @@
 {
   "name": "iam",
-  "version": "0.1.5",
+  "version": "0.2.1",
   "description": "Small IAM authentication, authorization, and session library for JavaScript.",
   "type": "module",
   "main": "./src/index.js",
@@ -23,5 +23,9 @@
   "license": "MIT",
   "dependencies": {
     "jose": "^6.2.3"
+  },
+  "devDependencies": {
+    "better-sqlite3": "^12.11.1",
+    "seq": "github:acmepy/seq"
   }
 }

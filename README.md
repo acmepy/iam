@@ -201,6 +201,15 @@ import { auth, can } from "iam/browser";
 npm test
 ```
 
+## Ejemplo SQLite en consola
+
+```sh
+npm run example:sqlite
+```
+
+El ejemplo usa SQLite en memoria con `SeqAdapter`, crea un usuario admin,
+inicia sesion, consulta roles/permisos y cierra la sesion.
+
 ## Licencia
 
 MIT

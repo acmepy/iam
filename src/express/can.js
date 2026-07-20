@@ -5,6 +5,12 @@ import {
 } from "../core/errors.js";
 import { getContext } from "./context.js";
 
+/**
+ * Express authorization middleware for a single permission.
+ *
+ * @param {string} permission
+ * @returns {import("../types.js").ExpressMiddleware}
+ */
 export function can(permission) {
   return async function rbacCan(req, res, next) {
     try {

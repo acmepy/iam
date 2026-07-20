@@ -1,5 +1,11 @@
 import { auth } from "./auth.js";
 
+/**
+ * Check whether the current browser session has a permission.
+ *
+ * @param {string} permission
+ * @returns {Promise<boolean>}
+ */
 export async function can(permission) {
   const session = auth.getSession();
 

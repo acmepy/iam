@@ -8,13 +8,24 @@ const defaultState = {
 
 let current = load(defaultState);
 
+/**
+ * Browser auth client that stores the current session locally.
+ */
 export const auth = {
+  /**
+   * @param {import("../types.js").BrowserAuthOptions} options
+   * @returns {typeof auth}
+   */
   configure(options = {}) {
     Object.assign(defaultState, options);
     current = load(defaultState);
     return this;
   },
 
+  /**
+   * @param {import("../types.js").BrowserCredentials} credentials
+   * @returns {Promise<import("../types.js").PublicSession>}
+   */
   async login(credentials = {}) {
     const session = credentials.token
       ? await loginWithToken(credentials.token)
@@ -25,6 +36,9 @@ export const auth = {
     return session;
   },
 
+  /**
+   * @returns {Promise<void>}
+   */
   async logout() {
     if (current?.id) {
       await request("/logout", {
@@ -37,6 +51,9 @@ export const auth = {
     remove(defaultState);
   },
 
+  /**
+   * @returns {import("../types.js").PublicSession | null}
+   */
   getSession() {
     return current;
   }

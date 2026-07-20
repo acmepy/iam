@@ -11,6 +11,12 @@ import { Auth } from "./AuthService.js";
 import { setContext } from "./context.js";
 import { verifyJwt } from "./jwt.js";
 
+/**
+ * Express middleware for JWT or Basic authentication.
+ *
+ * @param {import("../types.js").ExpressAuthOptions} options
+ * @returns {import("../types.js").ExpressMiddleware}
+ */
 export function auth(options = {}) {
   const { adapter, secret } = options;
 

@@ -2,7 +2,13 @@ import { now } from "../core/utils.js";
 
 const collections = ["users", "roles", "permissions", "userRoles", "rolePermissions", "sessions"];
 
+/**
+ * In-memory IAM adapter, useful for tests, demos, and small embedded setups.
+ */
 export class MemoryAdapter {
+  /**
+   * @param {import("../types.js").AdapterData} data
+   */
   constructor(data = {}) {
     for (const name of collections) this[name] = [...(data[name] ?? [])];
   }

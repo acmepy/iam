@@ -1,14 +1,27 @@
 {
   "name": "iam",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Small IAM authentication, authorization, and session library for JavaScript.",
   "type": "module",
   "main": "./src/index.js",
+  "types": "./src/index.d.ts",
   "exports": {
-    ".": "./src/index.js",
-    "./adapters": "./src/adapters/index.js",
-    "./express": "./src/express/index.js",
-    "./browser": "./src/browser/index.js"
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./adapters": {
+      "types": "./src/adapters/index.d.ts",
+      "import": "./src/adapters/index.js"
+    },
+    "./express": {
+      "types": "./src/express/index.d.ts",
+      "import": "./src/express/index.js"
+    },
+    "./browser": {
+      "types": "./src/browser/index.d.ts",
+      "import": "./src/browser/index.js"
+    }
   },
   "scripts": {
     "test": "node --test"

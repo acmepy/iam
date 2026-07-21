@@ -185,6 +185,41 @@ const session = await auth.login({
 console.log(session.user.id); // admin
 ```
 
+#### Modelos y tablas personalizadas
+
+`SeqAdapter` y `SequelizeAdapter` pueden recibir modelos ya definidos cuando necesitás controlar completamente la definición:
+
+```js
+const adapter = new SeqAdapter({
+  models: {
+    User,
+    Role,
+    Permission,
+    UserRole,
+    RolePermission,
+    Session
+  }
+});
+```
+
+Si solo necesitás cambiar los nombres físicos de las tablas, podés pasar `tableNames` y dejar que `iam` defina los modelos internos:
+
+```js
+const adapter = new SeqAdapter({
+  seq,
+  tableNames: {
+    User: "iam_users",
+    Role: "iam_roles",
+    Permission: "iam_permissions",
+    UserRole: "iam_user_roles",
+    RolePermission: "iam_role_permissions",
+    Session: "iam_sessions"
+  }
+});
+```
+
+Las claves de `models` y `tableNames` corresponden a los modelos internos de IAM: `User`, `Role`, `Permission`, `UserRole`, `RolePermission` y `Session`.
+
 ## Exportaciones
 
 ```js

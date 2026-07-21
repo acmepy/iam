@@ -40,6 +40,29 @@ test("SeqAdapter works with in-memory sqlite", async () => {
   }
 });
 
+test("SeqAdapter accepts custom IAM table names", () => {
+  const sqlite = new SQLiteAdapter({ database: ":memory:" });
+  const seq = new Seq({ adapter: sqlite, logging: false });
+  const adapter = new SeqAdapter({
+    seq,
+    tableNames: {
+      User: "iam_users",
+      Role: "iam_roles",
+      Permission: "iam_permissions",
+      UserRole: "iam_user_roles",
+      RolePermission: "iam_role_permissions",
+      Session: "iam_sessions"
+    }
+  });
+
+  assert.equal(adapter.models.User.tableName, "iam_users");
+  assert.equal(adapter.models.Role.tableName, "iam_roles");
+  assert.equal(adapter.models.Permission.tableName, "iam_permissions");
+  assert.equal(adapter.models.UserRole.tableName, "iam_user_roles");
+  assert.equal(adapter.models.RolePermission.tableName, "iam_role_permissions");
+  assert.equal(adapter.models.Session.tableName, "iam_sessions");
+});
+
 test("express middleware can use SeqAdapter", async () => {
   const sqlite = new SQLiteAdapter({ database: ":memory:" });
   const seq = new Seq({ adapter: sqlite, logging: false });

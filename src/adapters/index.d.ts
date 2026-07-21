@@ -57,7 +57,7 @@ export class IndexedDBAdapter extends MemoryAdapter {
 }
 
 export class SequelizeAdapter implements Adapter {
-  constructor(options?: { sequelize?: unknown; models?: Record<string, unknown> });
+  constructor(options?: { sequelize?: unknown; models?: Record<string, unknown>; tableNames?: Record<string, string> });
   sequelize?: unknown;
   models: Record<string, unknown>;
   findUserByUsername(username: string): Promise<UserData | null>;
@@ -75,6 +75,6 @@ export class SequelizeAdapter implements Adapter {
 }
 
 export class SeqAdapter extends SequelizeAdapter {
-  constructor(options?: { seq?: unknown; models?: Record<string, unknown> });
+  constructor(options?: { seq?: unknown; models?: Record<string, unknown>; tableNames?: Record<string, string> });
   seq?: unknown;
 }

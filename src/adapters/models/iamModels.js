@@ -1,7 +1,9 @@
-export function defineIamModels({ define, DataTypes }) {
+export function defineIamModels({ define, DataTypes, tableNames = {} }) {
   return Object.fromEntries(
     modelDefinitions.map((definition) => {
-      return [ definition.name, define(definition.name, mapAttributes(definition.attributes, DataTypes), { tableName: definition.tableName, timestamps: true})];
+      const tableName = tableNames[definition.name] ?? definition.tableName;
+
+      return [ definition.name, define(definition.name, mapAttributes(definition.attributes, DataTypes), { tableName, timestamps: true})];
     })
   );
 }

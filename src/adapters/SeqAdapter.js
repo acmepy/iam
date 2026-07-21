@@ -4,10 +4,10 @@ import { createSessionId, now } from "../core/utils.js";
 import { defineIamModels } from "./models/iamModels.js";
 
 export class SeqAdapter {
-  constructor({ seq, models } = {}) {
+  constructor({ seq, models, tableNames } = {}) {
     if (!seq && !models) throw new AdapterError("Seq o models son requeridos");
     this.seq = seq;
-    this.models = models ?? defineIamModels({define: seq.define.bind(seq), DataTypes});
+    this.models = models ?? defineIamModels({define: seq.define.bind(seq), DataTypes, tableNames});
   }
 
   async findUserByUsername(username) {

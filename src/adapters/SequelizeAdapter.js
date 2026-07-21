@@ -3,10 +3,10 @@ import { createSessionId, now } from "../core/utils.js";
 import { defineIamModels } from "./models/iamModels.js";
 
 export class SequelizeAdapter {
-  constructor({ sequelize, models } = {}) {
+  constructor({ sequelize, models, tableNames } = {}) {
     if (!sequelize && !models) throw new AdapterError("Sequelize o models son requeridos");
     this.sequelize = sequelize;
-    this.models = models ?? defineIamModels({define: sequelize.define.bind(sequelize), DataTypes: sequelize.Sequelize.DataTypes});
+    this.models = models ?? defineIamModels({define: sequelize.define.bind(sequelize), DataTypes: sequelize.Sequelize.DataTypes, tableNames});
   }
 
   async findUserByUsername(username) {

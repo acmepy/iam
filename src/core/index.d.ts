@@ -24,7 +24,7 @@ export class RBAC {
   constructor(options?: { adapter?: Adapter });
   adapter: Adapter;
   getRoles(userId: Id): Promise<RoleData[]>;
-  getPermissions(userId: Id): Promise<PermissionData[]>;
+  getPermissions(userId: Id, permission?: string): Promise<PermissionData[]>;
   hasRole(userId: Id, role: string): Promise<boolean>;
   can(userId: Id, permission: string): Promise<boolean>;
 }

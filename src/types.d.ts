@@ -116,7 +116,7 @@ export interface Adapter {
   deactivateSession(id: Id): Promise<SessionData | null>;
   updateSession?(id: Id, values: Partial<SessionData>): Promise<SessionData | null>;
   findRolesByUserId(userId: Id): Promise<RoleData[]>;
-  findPermissionsByUserId(userId: Id): Promise<PermissionData[]>;
+  findPermissionsByUserId(userId: Id, permission?: string): Promise<PermissionData[]>;
 }
 
 export interface AdapterData {

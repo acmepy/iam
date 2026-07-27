@@ -29,7 +29,7 @@ export class MemoryAdapter implements Adapter {
   deactivateSession(id: Id): Promise<SessionData | null>;
   updateSession(id: Id, values: Partial<SessionData>): Promise<SessionData | null>;
   findRolesByUserId(userId: Id): Promise<RoleData[]>;
-  findPermissionsByUserId(userId: Id): Promise<PermissionData[]>;
+  findPermissionsByUserId(userId: Id, permission?: string): Promise<PermissionData[]>;
 }
 
 export class LocalStorageAdapter extends MemoryAdapter {
@@ -70,7 +70,7 @@ export class SequelizeAdapter implements Adapter {
   deactivateSession(id: Id): Promise<SessionData | null>;
   updateSession(id: Id, values: Partial<SessionData>): Promise<SessionData | null>;
   findRolesByUserId(userId: Id): Promise<RoleData[]>;
-  findPermissionsByUserId(userId: Id): Promise<PermissionData[]>;
+  findPermissionsByUserId(userId: Id, permission?: string): Promise<PermissionData[]>;
   opOr(): unknown;
 }
 

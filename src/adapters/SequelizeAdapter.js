@@ -6,7 +6,7 @@ export class SequelizeAdapter {
   constructor({ sequelize, models, tableNames } = {}) {
     if (!sequelize && !models) throw new AdapterError("Sequelize o models son requeridos");
     this.sequelize = sequelize;
-    this.models = models ?? defineIamModels({define: sequelize.define.bind(sequelize), DataTypes: sequelize.Sequelize.DataTypes, tableNames});
+    this.models = models ?? defineIamModels({define: sequelize.define.bind(sequelize), DataTypes: sequelize.Sequelize.DataTypes, tableNames, associations: true});
   }
 
   async findUserByUsername(username) {
@@ -62,15 +62,34 @@ export class SequelizeAdapter {
     return roles.map(normalize);
   }
 
-  async findPermissionsByUserId(userId) {
-    const roles = await this.findRolesByUserId(userId);
-    const roleIds = roles.map((role) => role.id);
-    if (roleIds.length === 0) return [];
-    const rolePermissions = await this.models.RolePermission.findAll({where: {roleId: roleIds, active: true}});
-    const permissionIds = rolePermissions.map((item) => item.permissionId);
-    if (permissionIds.length === 0) return [];
-    const permissions = await this.models.Permission.findAll({where: {id: permissionIds, active: true}});
-    return permissions.map(normalize);
+  async findPermissionsByUserId(userId, permission) {
+    const userRoles = await this.models.UserRole.findAll({
+      where: { userId, active: true },
+      attributes: ["roleId"],
+      include: [{
+        model: this.models.Role,
+        as: "role",
+        where: { active: true },
+        attributes: ["id"],
+        required: true
+      }]
+    });
+    const assignedRoleIds = userRoles.map((item) => readValue(item, "roleId"));
+    if (assignedRoleIds.length === 0) return [];
+    const where = {active: true};
+    if (permission) where.permission = permission;
+    const rolePermissions = await this.models.RolePermission.findAll({
+      where: {roleId: assignedRoleIds, active: true},
+      attributes: ["permissionId"],
+      include: [{
+        model: this.models.Permission,
+        as: "permission",
+        where,
+        required: true
+      }]
+    });
+
+    return uniqueNormalized(rolePermissions.map((item) => readValue(item, "permission")).filter(Boolean));
   }
 
   opOr() {
@@ -83,3 +102,23 @@ function normalize(model) {
   return typeof model.get === "function" ? model.get({ plain: true }) : model;
 }
 
+function readValue(model, key) {
+  if (!model) return undefined;
+  if (typeof model.get === "function") {
+    const values = model.get({ plain: true });
+    if (values && Object.prototype.hasOwnProperty.call(values, key)) return values[key];
+  }
+  return typeof model.getDataValue === "function" ? model.getDataValue(key) : model[key];
+}
+
+function uniqueNormalized(models) {
+  const seen = new Set();
+  const result = [];
+  for (const model of models) {
+    const item = normalize(model);
+    if (!item || seen.has(item.id)) continue;
+    seen.add(item.id);
+    result.push(item);
+  }
+  return result;
+}

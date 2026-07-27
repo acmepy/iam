@@ -22,10 +22,11 @@ export class RBAC {
 
   /**
    * @param {import("../types.js").Id} userId
+   * @param {string} [permission]
    * @returns {Promise<import("../types.js").PermissionData[]>}
    */
-  async getPermissions(userId) {
-    return this.adapter.findPermissionsByUserId(userId);
+  async getPermissions(userId, permission) {
+    return this.adapter.findPermissionsByUserId(userId, permission);
   }
 
   /**
@@ -44,7 +45,7 @@ export class RBAC {
    * @returns {Promise<boolean>}
    */
   async can(userId, permission) {
-    const permissions = await this.getPermissions(userId);
+    const permissions = await this.getPermissions(userId, permission);
     return permissions.some((item) => item.permission === permission && item.active !== false);
   }
 }

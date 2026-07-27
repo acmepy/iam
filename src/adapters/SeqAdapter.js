@@ -7,7 +7,7 @@ export class SeqAdapter {
   constructor({ seq, models, tableNames } = {}) {
     if (!seq && !models) throw new AdapterError("Seq o models son requeridos");
     this.seq = seq;
-    this.models = models ?? defineIamModels({define: seq.define.bind(seq), DataTypes, tableNames});
+    this.models = models ?? defineIamModels({define: seq.define.bind(seq), DataTypes, tableNames, references: true, associations: true});
   }
 
   async findUserByUsername(username) {
@@ -63,19 +63,43 @@ export class SeqAdapter {
     return roles.map(normalize);
   }
 
-  async findPermissionsByUserId(userId) {
-    const roles = await this.findRolesByUserId(userId);
-    const roleIds = roles.map((role) => role.id);
-    if (roleIds.length === 0) return [];
-    const rolePermissions = await this.models.RolePermission.findAll({where: {roleId: { [Op.in]: roleIds },active: true}});
-    const permissionIds = rolePermissions.map((item) => item.getDataValue("permissionId"));
-    if (permissionIds.length === 0) return [];
-    const permissions = await this.models.Permission.findAll({where: {id: { [Op.in]: permissionIds }, active: true}});
-    return permissions.map(normalize);
+  async findPermissionsByUserId(userId, permission) {
+    const where = { active: true };
+    if (permission) where.permission = permission;
+    const rolePermissions = await this.models.RolePermission.findAll({
+      where: {active: true},
+      attributes: ["permissionId"],
+      //eager: false,
+      include: [
+        {model: this.models.Permission, as: "permission", where, required: true},
+        {
+          model: this.models.Role,
+          as: "role",
+          where: { active: true },
+          attributes: ["id"],
+          required: true,
+          include: {model: this.models.UserRole, as: "userRoles", where: { userId, active: true }, attributes: ["id"], required: true}
+        }
+      ]
+    });
+
+    return uniqueNormalized(rolePermissions.map((item) => item.getDataValue("permission")).filter(Boolean));
   }
 }
 
 function normalize(model) {
   if (!model)  return null;
   return typeof model.get === "function" ? model.get() : model;
+}
+
+function uniqueNormalized(models) {
+  const seen = new Set();
+  const result = [];
+  for (const model of models) {
+    const item = normalize(model);
+    if (!item || seen.has(item.id)) continue;
+    seen.add(item.id);
+    result.push(item);
+  }
+  return result;
 }

@@ -62,10 +62,10 @@ export class MemoryAdapter {
     return this.roles.filter((role) => roleIds.includes(role.id) && role.active !== false);
   }
 
-  async findPermissionsByUserId(userId) {
+  async findPermissionsByUserId(userId, permission) {
     const roles = await this.findRolesByUserId(userId);
     const roleIds = roles.map((role) => role.id);
     const permissionIds = this.rolePermissions.filter((rolePermission) => {return roleIds.includes(rolePermission.roleId) && rolePermission.active !== false}).map((rolePermission) => rolePermission.permissionId);
-    return this.permissions.filter((permission) => {return permissionIds.includes(permission.id) && permission.active !== false;});
+    return this.permissions.filter((item) => {return permissionIds.includes(item.id) && item.active !== false && (!permission || item.permission === permission);});
   }
 }

@@ -71,3 +71,30 @@ test("RBAC checks roles and permissions", async () => {
   assert.equal(await rbac.can("admin", "users.list"), true);
   assert.equal(await rbac.can("admin", "users.delete"), false);
 });
+
+test("RBAC passes permission filter to adapter", async () => {
+  let requestedPermission;
+  const adapter = {
+    async findRolesByUserId() {
+      return [];
+    },
+    async findPermissionsByUserId(userId, permission) {
+      requestedPermission = permission;
+      assert.equal(userId, "admin");
+      return [{ id: 1, permission: "users.list", active: true }];
+    }
+  };
+  const rbac = new RBAC({ adapter });
+
+  assert.equal(await rbac.can("admin", "users.list"), true);
+  assert.equal(requestedPermission, "users.list");
+});
+
+test("RBAC getPermissions keeps full-list behavior", async () => {
+  const rbac = new RBAC({ adapter: createAdapter() });
+
+  assert.deepEqual(
+    (await rbac.getPermissions("admin")).map((item) => item.permission),
+    ["users.list"]
+  );
+});

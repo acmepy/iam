@@ -2,7 +2,6 @@ export function defineIamModels({ define, DataTypes, tableNames = {} }) {
   return Object.fromEntries(
     modelDefinitions.map((definition) => {
       const tableName = tableNames[definition.name] ?? definition.tableName;
-
       return [ definition.name, define(definition.name, mapAttributes(definition.attributes, DataTypes), { tableName, timestamps: true})];
     })
   );
@@ -77,34 +76,15 @@ function mapAttributes(attributes, DataTypes) {
   return Object.fromEntries(
     Object.entries(attributes).map(([name, attribute]) => {
       const { type, length, ...options } = attribute;
-
-      return [
-        name,
-        {
-          ...options,
-          type: mapType(type, length, DataTypes)
-        }
-      ];
+      return [name, {...options, type: mapType(type, length, DataTypes)}];
     })
   );
 }
 
 function mapType(type, length, DataTypes) {
-  if (type === "string") {
-    return typeof DataTypes.STRING === "function" ? DataTypes.STRING(length) : DataTypes.STRING;
-  }
-
-  if (type === "integer") {
-    return DataTypes.INTEGER;
-  }
-
-  if (type === "boolean") {
-    return DataTypes.BOOLEAN;
-  }
-
-  if (type === "json") {
-    return DataTypes.JSON;
-  }
-
+  if (type === "string") return typeof DataTypes.STRING === "function" ? DataTypes.STRING(length) : DataTypes.STRING;
+  if (type === "integer") return DataTypes.INTEGER;
+  if (type === "boolean") return DataTypes.BOOLEAN;
+  if (type === "json") return DataTypes.JSON;
   throw new TypeError(`Tipo de modelo IAM no soportado: ${type}`);
 }

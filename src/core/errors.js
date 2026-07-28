@@ -7,11 +7,7 @@ export class RbacError extends Error {
     this.code = code;
     this.errors = errors;
     this.isOperational = true;
-
-    if (stack) {
-      this.stack = stack;
-    }
-
+    if (stack) this.stack = stack;
     Error.captureStackTrace?.(this, this.constructor);
   }
 }

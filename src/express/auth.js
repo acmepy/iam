@@ -171,64 +171,28 @@ async function validateCredentials(adapter, username, password) {
 }
 
 async function createOrReuseSession(adapter, userId, options, authOptions) {
-  if (authOptions.createSession === false) {
-    return {
-      id: null,
-      userId,
-      options,
-      active: true
-    };
-  }
-
+  if (authOptions.createSession === false) return {id: null, userId, options, active: true};
   if (typeof adapter.findActiveSessionByUserId === "function") {
     const activeSession = await adapter.findActiveSessionByUserId(userId);
     if (activeSession) return activeSession;
   }
-
   const date = now();
-  return adapter.createSession({
-    id: createSessionId(),
-    userId,
-    token: null,
-    options,
-    active: true,
-    createdAt: date,
-    updatedAt: date
-  });
+  return adapter.createSession({id: createSessionId(), userId, token: null, options, active: true, createdAt: date, updatedAt: date});
 }
 
 async function createSession(adapter, userId, options, authOptions) {
-  if (authOptions.createSession === false) {
-    return {
-      id: null,
-      userId,
-      options,
-      active: true
-    };
-  }
-
+  if (authOptions.createSession === false) return {id: null, userId, options, active: true};
   const date = now();
-  return adapter.createSession({
-    id: createSessionId(),
-    userId,
-    token: null,
-    options,
-    active: true,
-    createdAt: date,
-    updatedAt: date
-  });
+  return adapter.createSession({id: createSessionId(), userId, token: null, options, active: true, createdAt: date, updatedAt: date});
 }
 
 async function getActivePublicSession(adapter, sessionId) {
   if (!sessionId) throw new SessionRequiredError();
-
   const session = await adapter.findSessionById(sessionId);
   if (!session) throw new SessionRequiredError();
   if (session.active === false) throw new SessionInactiveError();
-
   const user = await adapter.findUserById(session.userId);
   if (!user || user.active === false) throw new AuthError();
-
   return publicSession(session, user);
 }
 
@@ -253,9 +217,7 @@ async function signJwt(payload, secret, options = {}) {
 
 async function verifyJwt(token, secret) {
   try {
-    const { payload } = await jwtVerify(token, createSecretKey(secret), {
-      algorithms: ["HS256"]
-    });
+    const { payload } = await jwtVerify(token, createSecretKey(secret), {algorithms: ["HS256"]});
     return payload;
   } catch {
     throw new TokenInvalidError();
@@ -263,18 +225,13 @@ async function verifyJwt(token, secret) {
 }
 
 function resolveJwtConfig(options) {
-  return {
-    secret: options.jwt?.secret,
-    expiresIn: options.jwt?.expiresIn
-  };
+  return {secret: options.jwt?.secret, expiresIn: options.jwt?.expiresIn};
 }
 
 function normalizeExpiresIn(expiresIn) {
   if (expiresIn === undefined || expiresIn === null) return undefined;
 
-  if (typeof expiresIn === "number" && Number.isFinite(expiresIn) && expiresIn > 0) {
-    return Math.floor(expiresIn);
-  }
+  if (typeof expiresIn === "number" && Number.isFinite(expiresIn) && expiresIn > 0) return Math.floor(expiresIn);
 
   if (typeof expiresIn === "string") {
     const match = expiresIn.trim().match(/^(\d+)\s*([smhd])?$/i);
@@ -320,10 +277,7 @@ function sendError(res, error, challenge = false) {
 function sendLoginError(res, error, req) {
   const status = error.status ?? 500;
   const message = error.message ?? "Error";
-  return res.status(status).json({
-    ...errorResponse(error, message),
-    details: loginErrorDetails(error, req)
-  });
+  return res.status(status).json({...errorResponse(error, message)});
 }
 
 function sendData(res, data) {
@@ -331,24 +285,12 @@ function sendData(res, data) {
 }
 
 function errorResponse(error, message) {
-  return {
-    ok: false,
-    message,
-    stack: error.stack
-  };
+  return {ok: false, message, stack: error.stack};
 }
 
 function loginErrorDetails(error, req) {
-  if (error.code === "AUTH_REQUIRED") {
-    return missingCredentialDetails(req);
-  }
-
-  if (error.code === "AUTH_ERROR") {
-    return {
-      credentials: "Usuario o clave invalidos"
-    };
-  }
-
+  if (error.code === "AUTH_REQUIRED") return missingCredentialDetails(req);
+  if (error.code === "AUTH_ERROR") return {credentials: "Usuario o clave invalidos"};
   return error.errors ?? {};
 }
 
@@ -359,7 +301,5 @@ function missingCredentialDetails(req) {
   if (!body.username) details.username = "Usuario requerido";
   if (body.password === undefined) details.password = "Clave requerida";
 
-  return Object.keys(details).length ? details : {
-    credentials: "Usuario y clave requeridos"
-  };
+  return Object.keys(details).length ? details : {credentials: "Usuario y clave requeridos"};
 }

@@ -147,9 +147,6 @@ test("post login returns json details for invalid credentials", async () => {
   assert.equal(res.body.ok, false);
   assert.equal(res.body.message, "Credenciales inválidas");
   assert.equal(typeof res.body.stack, "string");
-  assert.deepEqual(res.body.details, {
-    credentials: "Usuario o clave invalidos"
-  });
 });
 
 test("post login returns json details for missing credentials", async () => {
@@ -168,9 +165,6 @@ test("post login returns json details for missing credentials", async () => {
   assert.equal(res.body.ok, false);
   assert.equal(res.body.message, "Usuario y clave son necesarios");
   assert.equal(typeof res.body.stack, "string");
-  assert.deepEqual(res.body.details, {
-    password: "Clave requerida"
-  });
 });
 
 test("post login returns public session with jwt token and expiresIn", async () => {

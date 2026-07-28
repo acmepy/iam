@@ -1,20 +1,19 @@
 # iam
 
-IAM es una pequeña biblioteca para autenticación, autorización y gestión de sesiones en JavaScript.
+IAM es una pequena biblioteca para autenticacion, autorizacion y gestion de sesiones en JavaScript.
 
-`iam` ofrece controles de acceso basado en roles, helpers de autenticación para servidor, clientes para navegador, middleware para Express y adaptadores de persistencia enchufables.
+`iam` ofrece control de acceso basado en roles, middleware para Express, cliente para navegador y adaptadores de persistencia enchufables.
 
-## Instalación
+## Instalacion
 
 ```sh
 npm install iam
 ```
 
-## Inicio rápido
+## Inicio rapido
 
 ```js
 import { MemoryAdapter, RBAC } from "iam";
-import { createAuth } from "iam/express";
 
 const adapter = new MemoryAdapter({
   users: [
@@ -33,40 +32,11 @@ const adapter = new MemoryAdapter({
   rolePermissions: [{ id: 1, roleId: 1, permissionId: 1, active: true }]
 });
 
-const auth = createAuth(adapter);
-
-const session = await auth.login({
-  username: "admin",
-  password: "1234",
-  options: { empresa: 1, sucursal: 2 }
-});
-
-console.log(session.user.id); // admin
-
 const rbac = new RBAC({ adapter });
 console.log(await rbac.can("admin", "users.list")); // true
 ```
 
-## API de autenticación del servidor
-
-### Auth
-
-```js
-import { MemoryAdapter } from "iam";
-import { Auth } from "iam/express";
-
-const auth = new Auth({ adapter: new MemoryAdapter() });
-```
-
-Métodos principales:
-
-- `login({ username, password, options })`: valida credenciales y crea una sesión pública.
-- `logout(sessionId)`: desactiva una sesión.
-- `getSession(sessionId)`: devuelve una sesión pública activa.
-- `createSession({ userId, token, options })`: crea una sesión directamente.
-- `createTemporarySession(user, options)`: crea una sesión temporal que no se persiste.
-
-### RBAC
+## RBAC
 
 ```js
 import { RBAC } from "iam";
@@ -79,32 +49,92 @@ await rbac.can("admin", "users.list");
 
 ## Middleware para Express
 
+`iam/express` expone solo dos middlewares publicos: `auth` y `can`.
+`auth(options)` se instala una vez con `app.use(...)`, autentica requests con Basic o Bearer JWT, maneja las rutas estandar de sesion y deja `req.session` disponible para las rutas protegidas.
+
 ```js
 import express from "express";
 import { MemoryAdapter } from "iam/adapters";
-import { auth, can, signJwt } from "iam/express";
+import { auth, can } from "iam/express";
 
 const app = express();
+app.use(express.json());
+
 const adapter = new MemoryAdapter();
-const secret = "replace-with-a-secure-secret";
-
-app.get(
-  "/users",
-  auth({ strategy: "jwt", secret, adapter }),
-  can("users.list"),
-  (req, res) => {
-    res.json({ session: req.session });
+const iamOptions = {
+  adapter,
+  jwt: {
+    secret: "replace-with-a-secure-secret",
+    expiresIn: "1h"
   }
-);
+};
 
-const token = await signJwt({ sessionId: "session-id" }, secret);
+app.use(auth(iamOptions));
+
+app.get("/users", can("users.list"), (req, res) => {
+  res.json({
+    ok: true,
+    data: [
+      { id: "admin", name: "Administrador", email: "admin@app.com" }
+    ]
+  });
+});
 ```
 
-`auth` admite:
+`auth(options)` admite:
 
-- Tokens bearer JWT con `auth({ strategy: "jwt", secret, adapter })`.
-- Autenticación básica con `auth({ strategy: "basic", adapter })`.
-- Detección automática de estrategia con `auth({ adapter, secret })`.
+- Tokens bearer JWT con `auth({ adapter, jwt: { secret, expiresIn } })`.
+- Autenticacion basica con `Authorization: Basic ...`.
+- Challenge nativo del navegador con `WWW-Authenticate: Basic realm="IAM"` cuando faltan credenciales.
+- Deteccion automatica de estrategia con `auth({ adapter, jwt: { secret } })`.
+
+Rutas manejadas por el middleware:
+
+- `POST /login`: valida credenciales y responde `{ ok: true, data: { ...session, token, expiresIn } }`.
+- `GET /session`: requiere Basic o Bearer JWT y responde `{ ok: true, data: { ...session } }`.
+- `POST /logout`: desactiva la sesion actual y responde `{ ok: true, data: {} }`.
+
+Formato de respuestas:
+
+```json
+{ "ok": true, "data": { "...": "..." } }
+```
+
+```json
+{ "ok": true, "data": [{ "...": "..." }] }
+```
+
+```json
+{ "ok": false, "message": "Mensaje de error", "stack": "..." }
+```
+
+Ejemplo de login:
+
+```sh
+curl -X POST http://localhost:3000/login \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"admin@app.com\",\"password\":\"1234\"}"
+```
+
+Si las credenciales son invalidas, `POST /login` responde JSON con detalles:
+
+```json
+{
+  "ok": false,
+  "message": "Credenciales invalidas",
+  "stack": "...",
+  "details": {
+    "credentials": "Usuario o clave invalidos"
+  }
+}
+```
+
+Ejemplo de ruta protegida:
+
+```sh
+curl http://localhost:3000/users \
+  -H "Authorization: Bearer <token>"
+```
 
 ## Cliente para navegador
 
@@ -131,12 +161,12 @@ if (await can("users.list")) {
 await auth.logout();
 ```
 
-El cliente del navegador espera que el servidor exponga:
+El cliente del navegador puede usar el servidor Express anterior:
 
-- `POST /login` para login con usuario y contraseña.
-- `POST /logout` para cerrar sesión.
+- `POST /login` para login con usuario y contrasena.
+- `POST /logout` para cerrar sesion.
 - `GET /session` para login con token bearer.
-- `GET /can/:permission` para verificar permisos cuando no están embebidos en la sesión.
+- Basic sin credenciales dispara el dialogo nativo del navegador por `WWW-Authenticate`.
 
 ## Adaptadores
 
@@ -148,16 +178,16 @@ Adaptadores disponibles:
 - `SequelizeAdapter`
 - `SeqAdapter`
 
-Los adaptadores se encargan de la búsqueda de usuarios, verificación de contraseñas, persistencia de sesiones, búsqueda de roles y búsqueda de permisos.
+Los adaptadores se encargan de la busqueda de usuarios, verificacion de contrasenas, persistencia de sesiones, busqueda de roles y busqueda de permisos.
 
 ### SeqAdapter
 
-`SeqAdapter` permite usar [`seq`](https://github.com/acmepy/seq) como motor de persistencia. Para SQLite se requiere instalar también `better-sqlite3`.
+`SeqAdapter` permite usar [`seq`](https://github.com/acmepy/seq) como motor de persistencia. Para SQLite se requiere instalar tambien `better-sqlite3`.
 
 ```js
 import { Seq, SQLiteAdapter } from "seq";
 import { SeqAdapter } from "iam/adapters";
-import { Auth } from "iam/express";
+import { RBAC } from "iam";
 
 const sqlite = new SQLiteAdapter({ database: ":memory:" });
 const seq = new Seq({ adapter: sqlite, logging: false });
@@ -175,19 +205,14 @@ await adapter.models.User.create({
   active: true
 });
 
-const auth = new Auth({ adapter });
-const session = await auth.login({
-  username: "admin",
-  password: "1234",
-  options: { empresa: 1 }
-});
+const rbac = new RBAC({ adapter });
 
-console.log(session.user.id); // admin
+console.log(await rbac.can("admin", "users.list")); // true
 ```
 
 #### Modelos y tablas personalizadas
 
-`SeqAdapter` y `SequelizeAdapter` pueden recibir modelos ya definidos cuando necesitás controlar completamente la definición:
+`SeqAdapter` y `SequelizeAdapter` pueden recibir modelos ya definidos cuando necesitas controlar completamente la definicion:
 
 ```js
 const adapter = new SeqAdapter({
@@ -202,7 +227,7 @@ const adapter = new SeqAdapter({
 });
 ```
 
-Si solo necesitás cambiar los nombres físicos de las tablas, podés pasar `tableNames` y dejar que `iam` defina los modelos internos:
+Si solo necesitas cambiar los nombres fisicos de las tablas, podes pasar `tableNames` y dejar que `iam` defina los modelos internos:
 
 ```js
 const adapter = new SeqAdapter({
@@ -224,10 +249,9 @@ Las claves de `models` y `tableNames` corresponden a los modelos internos de IAM
 
 ```js
 import { RBAC, MemoryAdapter } from "iam";
-import { Auth, createAuth } from "iam/express";
 import { MemoryAdapter, SeqAdapter } from "iam/adapters";
-import { auth, can, signJwt, verifyJwt } from "iam/express";
-import { auth, can } from "iam/browser";
+import { auth, can } from "iam/express";
+import { auth as browserAuth, can as browserCan } from "iam/browser";
 ```
 
 ## Pruebas
@@ -243,7 +267,7 @@ npm run example:sqlite
 ```
 
 El ejemplo usa SQLite en memoria con `SeqAdapter`, crea un usuario admin,
-inicia sesion, consulta roles/permisos y cierra la sesion.
+crea una sesion, consulta roles/permisos y cierra la sesion.
 
 ## Licencia
 

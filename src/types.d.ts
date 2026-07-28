@@ -18,7 +18,10 @@ export type AuthStrategy = "jwt" | "basic";
 
 export interface ExpressAuthOptions {
   adapter: Adapter;
-  secret?: string;
+  jwt?: {
+    secret: string;
+    expiresIn?: number | string;
+  };
   strategy?: AuthStrategy;
   strategies?: AuthStrategy[];
   createSession?: boolean;

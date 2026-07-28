@@ -12,17 +12,30 @@ import { getContext } from "./context.js";
  * @returns {import("../types.js").ExpressMiddleware}
  */
 export function can(permission) {
-  return async function rbacCan(req, res, next) {
+  return async function iamCan(req, res, next) {
     try {
       if (!permission) throw new PermissionRequiredError();
+
       const context = getContext(req);
       const userId = req.session?.user?.id;
       if (!context || !userId) throw new SessionRequiredError();
+
       const allowed = await context.rbac.can(userId, permission);
       if (!allowed) throw new ForbiddenError();
+
       return next();
     } catch (error) {
-      return res.status(error.status ?? 500).json({error: error.message ?? "Error", code: error.code ?? "RBAC_ERROR"});
+      return sendError(res, error);
     }
   };
+}
+
+function sendError(res, error) {
+  const status = error.status ?? 500;
+  const message = error.message ?? "Error";
+  return res.status(status).json({
+    ok: false,
+    message,
+    stack: error.stack
+  });
 }

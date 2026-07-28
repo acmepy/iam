@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Seq, SQLiteAdapter } from "seq";
 import { SeqAdapter } from "../src/adapters/index.js";
-import { Auth, auth, can } from "../src/express/index.js";
+import { auth, can } from "../src/express/index.js";
 
 test("SeqAdapter works with in-memory sqlite", async () => {
   const sqlite = new SQLiteAdapter({ database: ":memory:" });
@@ -14,14 +14,15 @@ test("SeqAdapter works with in-memory sqlite", async () => {
     await seq.sync();
     await seed(adapter.models);
 
-    const service = new Auth({ adapter });
-    const session = await service.login({
-      username: "admin@app.com",
-      password: "1234",
-      options: { empresa: 1 }
+    const session = await adapter.createSession({
+      id: "session-1",
+      userId: "admin",
+      token: null,
+      options: { empresa: 1 },
+      active: true
     });
 
-    assert.equal(session.user.id, "admin");
+    assert.equal(session.userId, "admin");
     assert.deepEqual(session.options, { empresa: 1 });
 
     const permissions = await adapter.findPermissionsByUserId("admin");
@@ -33,7 +34,7 @@ test("SeqAdapter works with in-memory sqlite", async () => {
     await adapter.updateSession(session.id, { token: "session-token" });
     assert.equal((await adapter.findSessionByToken("session-token")).id, session.id);
 
-    await service.logout(session.id);
+    await adapter.deactivateSession(session.id);
     assert.equal((await adapter.findSessionById(session.id)).active, false);
   } finally {
     await seq.close();
@@ -331,6 +332,17 @@ function createResponse() {
     },
     json(value) {
       this.body = value;
+      return this;
+    }
+  };
+}
+
+function createApp() {
+  return {
+    get() {
+      return this;
+    },
+    post() {
       return this;
     }
   };

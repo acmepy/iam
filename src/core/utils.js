@@ -15,11 +15,12 @@ export function publicUser(user) {
   };
 }
 
-export function publicSession(session, user) {
+export function publicSession(session, user, extras = {}) {
   return {
     id: session.id,
     user: publicUser(user),
-    options: session.options ?? {}
+    options: session.options ?? {},
+    ...extras
   };
 }
 

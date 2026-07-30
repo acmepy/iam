@@ -10,7 +10,7 @@ import {
   TokenRequiredError,
   ValidationError
 } from "../core/errors.js";
-import { createSessionId, now, publicSession, publicUser } from "../core/utils.js";
+import { createSessionId, now, publicSession } from "../core/utils.js";
 import { setContext } from "./context.js";
 
 const basicRealm = "IAM";
@@ -61,7 +61,7 @@ async function handleLogin(req, res, { authCore, jwt, options }) {
 
     const user = await validateCredentials(authCore.adapter, credentials.username, credentials.password);
     const session = await createSession(authCore.adapter, user.id, credentials.options ?? {}, options);
-    const publicValue = publicSession(session, user);
+    const publicValue = await createPublicSession(authCore, session, user);
     const expiresIn = normalizeExpiresIn(jwt.expiresIn);
     const token = await signJwt({ sessionId: session.id }, jwt.secret, { expiresIn });
 
@@ -91,7 +91,7 @@ async function authenticateRequest(req, { authCore, jwt, options }) {
 
   if (!strategy) throw new TokenRequiredError();
   if (strategy === "jwt") return authenticateJwt(header, authCore, jwt);
-  return authenticateBasic(header, authCore.adapter, options);
+  return authenticateBasic(header, authCore, options);
 }
 
 async function authenticateJwt(header, authCore, jwt) {
@@ -105,14 +105,14 @@ async function authenticateJwt(header, authCore, jwt) {
   const sessionId = payload.sessionId ?? payload.id;
   if (!sessionId) throw new TokenInvalidError();
 
-  return getActivePublicSession(authCore.adapter, sessionId);
+  return getActivePublicSession(authCore, sessionId);
 }
 
-async function authenticateBasic(header, adapter, options) {
+async function authenticateBasic(header, authCore, options) {
   const credentials = credentialsFromBasicValue(header.slice("Basic ".length).trim());
-  const user = await validateCredentials(adapter, credentials.username, credentials.password);
-  const session = await createOrReuseSession(adapter, user.id, {}, options);
-  return publicSession(session, user);
+  const user = await validateCredentials(authCore.adapter, credentials.username, credentials.password);
+  const session = await createOrReuseSession(authCore.adapter, user.id, {}, options);
+  return createPublicSession(authCore, session, user);
 }
 
 function resolveStrategy(header, options) {
@@ -186,14 +186,25 @@ async function createSession(adapter, userId, options, authOptions) {
   return adapter.createSession({id: createSessionId(), userId, token: null, options, active: true, createdAt: date, updatedAt: date});
 }
 
-async function getActivePublicSession(adapter, sessionId) {
+async function getActivePublicSession(authCore, sessionId) {
   if (!sessionId) throw new SessionRequiredError();
-  const session = await adapter.findSessionById(sessionId);
+  const session = await authCore.adapter.findSessionById(sessionId);
   if (!session) throw new SessionRequiredError();
   if (session.active === false) throw new SessionInactiveError();
-  const user = await adapter.findUserById(session.userId);
+  const user = await authCore.adapter.findUserById(session.userId);
   if (!user || user.active === false) throw new AuthError();
-  return publicSession(session, user);
+  return createPublicSession(authCore, session, user);
+}
+
+async function createPublicSession(authCore, session, user) {
+  const permissions = await authCore.rbac.getPermissions(user.id);
+  return publicSession(session, user, {
+    permissions: Array.from(new Set(
+      permissions
+        .filter((item) => item?.active !== false && item.permission)
+        .map((item) => item.permission)
+    ))
+  });
 }
 
 function attach(req, { authCore, rbac, session }) {

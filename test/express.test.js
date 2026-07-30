@@ -80,6 +80,7 @@ test("basic auth allows a permitted request", async () => {
 
   assert.equal(allowed, true);
   assert.equal(req.session.user.id, "admin");
+  assert.deepEqual(req.session.permissions, ["users.list"]);
 });
 
 test("application list responses use data as the collection", async () => {
@@ -185,6 +186,7 @@ test("post login returns public session with jwt token and expiresIn", async () 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.ok, true);
   assert.equal(res.body.data.user.id, "admin");
+  assert.deepEqual(res.body.data.permissions, ["users.list"]);
   assert.deepEqual(res.body.data.options, { empresa: 2 });
   assert.equal(typeof res.body.data.token, "string");
   assert.equal(res.body.data.expiresIn, 3600);
@@ -208,6 +210,7 @@ test("get session accepts bearer jwt tokens", async () => {
   assert.equal(res.body.ok, true);
   assert.equal(res.body.data.id, login.body.data.id);
   assert.equal(res.body.data.user.id, "admin");
+  assert.deepEqual(res.body.data.permissions, ["users.list"]);
 });
 
 test("expired jwt tokens are rejected", async () => {

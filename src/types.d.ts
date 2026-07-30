@@ -130,3 +130,21 @@ export interface AdapterData {
   rolePermissions?: RolePermissionData[];
   sessions?: SessionData[];
 }
+
+export interface AuditChange {
+  module: string;
+  resource: string;
+  tableName: string;
+  action: string;
+  rowId?: Id | null;
+  old?: Dict;
+  new?: Dict;
+}
+
+export type Auditable =
+  | ((change: AuditChange) => unknown | Promise<unknown>)
+  | {
+      tableName?: string;
+      write?: (change: AuditChange) => unknown | Promise<unknown>;
+      onChange?: (change: AuditChange) => unknown | Promise<unknown>;
+    };

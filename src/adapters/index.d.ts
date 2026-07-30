@@ -1,6 +1,7 @@
 import type {
   Adapter,
   AdapterData,
+  Auditable,
   Id,
   KeyValueStorage,
   PermissionData,
@@ -75,6 +76,6 @@ export class SequelizeAdapter implements Adapter {
 }
 
 export class SeqAdapter extends SequelizeAdapter {
-  constructor(options?: { seq?: unknown; models?: Record<string, unknown>; tableNames?: Record<string, string> });
+  constructor(options?: { seq?: unknown; models?: Record<string, unknown>; tableNames?: Record<string, string>; auditable?: Auditable });
   seq?: unknown;
 }

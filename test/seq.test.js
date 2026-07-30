@@ -64,6 +64,48 @@ test("SeqAdapter accepts custom IAM table names", () => {
   assert.equal(adapter.models.Session.tableName, "iam_sessions");
 });
 
+test("SeqAdapter can emit auditable session changes", async () => {
+  const sqlite = new SQLiteAdapter({ database: ":memory:" });
+  const seq = new Seq({ adapter: sqlite, logging: false });
+  const changes = [];
+  const adapter = new SeqAdapter({ seq, auditable: { tableName: "iam_sessions", write: (change) => changes.push(change) } });
+
+  try {
+    await seq.init();
+    await seq.sync();
+    await adapter.models.User.create({
+      id: "admin",
+      password: "1234",
+      name: "Administrador",
+      email: "admin@app.com",
+      options: {},
+      active: true
+    });
+
+    const session = await adapter.createSession({
+      id: "session-1",
+      userId: "admin",
+      token: null,
+      options: {},
+      active: true
+    });
+    await adapter.updateSession(session.id, { token: "session-token" });
+    await adapter.deactivateSession(session.id);
+
+    assert.deepEqual(changes.map((change) => change.action), ["create", "update", "update"]);
+    assert.deepEqual(changes.map((change) => change.tableName), ["iam_sessions", "iam_sessions", "iam_sessions"]);
+    assert.equal(changes[0].rowId, "session-1");
+    assert.deepEqual(changes[0].old, {});
+    assert.equal(changes[0].new.userId, "admin");
+    assert.equal(changes[1].old.token, null);
+    assert.equal(changes[1].new.token, "session-token");
+    assert.equal(changes[2].old.active, true);
+    assert.equal(changes[2].new.active, false);
+  } finally {
+    await seq.close();
+  }
+});
+
 test("SeqAdapter defines IAM foreign key references", async () => {
   const sqlite = new SQLiteAdapter({ database: ":memory:" });
   const seq = new Seq({ adapter: sqlite, logging: false });

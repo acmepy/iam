@@ -210,6 +210,20 @@ const rbac = new RBAC({ adapter });
 console.log(await rbac.can("admin", "users.list")); // true
 ```
 
+`SeqAdapter` tambien puede emitir cambios auditables de sesion sin acoplarse a ningun sistema de auditoria especifico:
+
+```js
+const adapter = new SeqAdapter({
+  seq,
+  auditable: {
+    tableName: "iam_sessions",
+    write: async (change) => {
+      // change: { module, resource, tableName, action, rowId, old, new }
+    }
+  }
+});
+```
+
 #### Modelos y tablas personalizadas
 
 `SeqAdapter` y `SequelizeAdapter` pueden recibir modelos ya definidos cuando necesitas controlar completamente la definicion:
@@ -268,6 +282,15 @@ npm run example:sqlite
 
 El ejemplo usa SQLite en memoria con `SeqAdapter`, crea un usuario admin,
 crea una sesion, consulta roles/permisos y cierra la sesion.
+
+## Ejemplo auditable
+
+```sh
+npm run example:auditable
+```
+
+El ejemplo usa `SeqAdapter` con `auditable`, crea una tabla `audit`, guarda alli los
+cambios de sesion de IAM y luego muestra las filas persistidas.
 
 ## Licencia
 

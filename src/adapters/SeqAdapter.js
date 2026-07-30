@@ -4,10 +4,11 @@ import { createSessionId, now } from "../core/utils.js";
 import { defineIamModels } from "./models/iamModels.js";
 
 export class SeqAdapter {
-  constructor({ seq, models, tableNames } = {}) {
+  constructor({ seq, models, tableNames, auditable } = {}) {
     if (!seq && !models) throw new AdapterError("Seq o models son requeridos");
     this.seq = seq;
     this.models = models ?? defineIamModels({define: seq.define.bind(seq), DataTypes, tableNames, references: true, associations: true});
+    this.auditable = normalizeAuditable(auditable);
   }
 
   async findUserByUsername(username) {
@@ -26,7 +27,10 @@ export class SeqAdapter {
   async createSession(session) {
     const values = {id: session.id ?? createSessionId(), ...session};
 
-    return normalize(await this.models.Session.create(values));
+    const created = await this.models.Session.create(values);
+    const next = normalize(created);
+    await writeAudit(this.auditable, { action: "create", rowId: next?.id, old: {}, new: next });
+    return next;
   }
 
   async findSessionById(id) {
@@ -44,15 +48,21 @@ export class SeqAdapter {
   async deactivateSession(id) {
     const session = await this.models.Session.findByPk(id);
     if (!session) return null;
+    const previous = normalize(session);
     await session.update({ active: false, updatedAt: now() });
-    return normalize(session);
+    const next = normalize(session);
+    await writeAudit(this.auditable, { action: "update", rowId: id, old: previous, new: next });
+    return next;
   }
 
   async updateSession(id, values) {
     const session = await this.models.Session.findByPk(id);
     if (!session) return null;
+    const previous = normalize(session);
     await session.update(values);
-    return normalize(session);
+    const next = normalize(session);
+    await writeAudit(this.auditable, { action: "update", rowId: id, old: previous, new: next });
+    return next;
   }
 
   async findRolesByUserId(userId) {
@@ -85,6 +95,24 @@ export class SeqAdapter {
 
     return uniqueNormalized(rolePermissions.map((item) => item.getDataValue("permission")).filter(Boolean));
   }
+}
+
+function normalizeAuditable(auditable) {
+  if (!auditable) return null;
+  if (typeof auditable === "function") return { write: auditable };
+  if (typeof auditable.write === "function") return auditable;
+  if (typeof auditable.onChange === "function") return { ...auditable, write: auditable.onChange };
+  return null;
+}
+
+async function writeAudit(auditable, change) {
+  if (!auditable) return;
+  await auditable.write({
+    module: "iam",
+    resource: "session",
+    tableName: auditable.tableName || "Session",
+    ...change
+  });
 }
 
 function normalize(model) {

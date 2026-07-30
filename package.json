@@ -1,6 +1,6 @@
 {
   "name": "iam",
-  "version": "0.4.1",
+  "version": "0.5.1",
   "description": "Small IAM authentication, authorization, and session library for JavaScript.",
   "type": "module",
   "main": "./src/index.js",
@@ -25,7 +25,8 @@
   },
   "scripts": {
     "example:sqlite": "node examples/sqlite.js",
-     "example:express": "node examples/express.js",
+    "example:express": "node examples/express.js",
+    "example:auditable": "node examples/auditable.js",
     "test": "node --test"
   },
   "keywords": [

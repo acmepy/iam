@@ -12,7 +12,7 @@ import { getContext } from "./context.js";
  * @returns {import("../types.js").ExpressMiddleware}
  */
 export function can(permission) {
-  return async function iamCan(req, res, next) {
+  async function iamCan(req, res, next) {
     try {
       if (!permission) throw new PermissionRequiredError();
 
@@ -27,7 +27,13 @@ export function can(permission) {
     } catch (error) {
       return sendError(res, error);
     }
-  };
+  }
+
+  iamCan.permission = permission;
+  iamCan.permissions = [permission];
+  iamCan.iam = { permission, permissions: [permission] };
+
+  return iamCan;
 }
 
 function sendError(res, error) {

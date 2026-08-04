@@ -168,6 +168,52 @@ El cliente del navegador puede usar el servidor Express anterior:
 - `GET /session` para login con token bearer.
 - Basic sin credenciales dispara el dialogo nativo del navegador por `WWW-Authenticate`.
 
+## OpenAPI y Postman por permisos
+
+`iam/docs` permite filtrar definiciones OpenAPI y colecciones Postman antes de mostrarlas al usuario. Las rutas publicas se conservan por defecto y las rutas protegidas deben declarar permisos con `x-permission`, `x-permissions`, `x-iam-permission` o `x-iam-permissions`.
+
+```js
+import { filterOpenApiByPermissions, filterPostmanByPermissions } from "iam/docs";
+
+const visibleOpenApi = filterOpenApiByPermissions(openApiDocument, session.permissions);
+const visibleCollection = filterPostmanByPermissions(postmanCollection, session.permissions);
+```
+
+Ejemplo OpenAPI:
+
+```json
+{
+  "paths": {
+    "/users": {
+      "get": {
+        "x-permission": "users.list",
+        "responses": {}
+      },
+      "post": {
+        "x-permission": "users.create",
+        "responses": {}
+      }
+    }
+  }
+}
+```
+
+Ejemplo Postman:
+
+```json
+{
+  "item": [
+    {
+      "name": "List users",
+      "x-permission": "users.list",
+      "request": { "method": "GET", "url": "/users" }
+    }
+  ]
+}
+```
+
+`can("users.list")` tambien expone metadata (`permission`, `permissions` e `iam`) para que herramientas de documentacion puedan leer el permiso asociado al middleware.
+
 ## Adaptadores
 
 Adaptadores disponibles:
@@ -266,6 +312,7 @@ import { RBAC, MemoryAdapter } from "iam";
 import { MemoryAdapter, SeqAdapter } from "iam/adapters";
 import { auth, can } from "iam/express";
 import { auth as browserAuth, can as browserCan } from "iam/browser";
+import { filterOpenApiByPermissions, filterPostmanByPermissions } from "iam/docs";
 ```
 
 ## Pruebas

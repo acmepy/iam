@@ -1,6 +1,6 @@
 {
   "name": "iam",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Small IAM authentication, authorization, and session library for JavaScript.",
   "type": "module",
   "main": "./dist/index.js",
@@ -37,7 +37,8 @@
     "example:sqlite": "node examples/sqlite.js",
     "example:express": "node examples/express.js",
     "example:auditable": "node examples/auditable.js",
-    "test": "node --test"
+    "test": "node --test",
+    "lint": "eslint src tests example"
   },
   "keywords": [
     "iam",
@@ -52,6 +53,7 @@
   },
   "devDependencies": {
     "better-sqlite3": "^12.11.1",
+    "eslint": "^10.7.0",
     "express": "^5.0.0",
     "rollup": "^4.62.4",
     "seq": "file:../seq-orm/seq"

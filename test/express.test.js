@@ -231,6 +231,7 @@ test("expired jwt tokens are rejected", async () => {
   await auth({ adapter: createAdapter(), jwt: { secret } })(req, res, () => {});
 
   assert.equal(res.statusCode, 401);
+  assert.equal(res.headers["WWW-Authenticate"], undefined);
   assert.equal(res.body.ok, false);
   assert.equal(res.body.message, "Token inválido");
   assert.equal(typeof res.body.stack, "string");
@@ -249,6 +250,7 @@ test("invalid jwt tokens are rejected", async () => {
   await auth({ adapter: createAdapter(), jwt: { secret } })(req, res, () => {});
 
   assert.equal(res.statusCode, 401);
+  assert.equal(res.headers["WWW-Authenticate"], undefined);
   assert.equal(res.body.ok, false);
   assert.equal(res.body.message, "Token inválido");
   assert.equal(typeof res.body.stack, "string");

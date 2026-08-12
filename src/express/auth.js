@@ -49,7 +49,7 @@ export function auth(options = {}) {
       attach(req, { authCore, rbac, session });
       return next();
     } catch (error) {
-      return sendError(res, error, shouldChallenge(error));
+      return sendError(res, error, shouldChallenge(error, req));
     }
   };
 }
@@ -269,8 +269,14 @@ function createSecretKey(secret) {
   return new TextEncoder().encode(secret);
 }
 
-function shouldChallenge(error) {
-  return [401, undefined].includes(error.status);
+function shouldChallenge(error, req) {
+  return [401, undefined].includes(error.status) && !hasBearerToken(req);
+}
+
+function hasBearerToken(req) {
+  const header = req.headers?.authorization ?? "";
+  if (!header.startsWith("Bearer ")) return false;
+  return Boolean(header.slice("Bearer ".length).trim());
 }
 
 function sendError(res, error, challenge = false) {

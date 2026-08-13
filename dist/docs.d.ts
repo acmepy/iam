@@ -1,4 +1,4 @@
-import type { PermissionData } from "../types.js";
+import type { PermissionData } from "./types.js";
 
 export interface PermissionFilterOptions {
   includePublic?: boolean;

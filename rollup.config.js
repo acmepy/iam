@@ -1,12 +1,10 @@
-import { cpSync, mkdirSync, readdirSync, rmSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 
 const entries = [
-  ["src/index.js", "dist/index.js"],
-  ["src/adapters/index.js", "dist/adapters/index.js"],
-  ["src/express/index.js", "dist/express/index.js"],
-  ["src/docs/index.js", "dist/docs/index.js"],
-  ["src/browser/index.js", "dist/browser/index.js"]
+  ["src/express/index.js", "dist/express.js"],
+  ["src/docs/index.js", "dist/docs.js"],
+  ["src/browser/index.js", "dist/browser.js"]
 ];
 
 function declarations() {
@@ -16,25 +14,25 @@ function declarations() {
       rmSync("dist", { recursive: true, force: true });
     },
     writeBundle() {
-      copyDeclarations("src", "dist");
+      writeDeclarations();
     }
   };
 }
 
-function copyDeclarations(from, to) {
-  for (const entry of readdirSync(from, { withFileTypes: true })) {
-    const source = join(from, entry.name);
-    const target = join(to, relative("src", source));
+function writeDeclarations() {
+  cpDeclaration("src/express/index.d.ts", "dist/express.d.ts");
+  cpDeclaration("src/docs/index.d.ts", "dist/docs.d.ts");
+  cpDeclaration("src/browser/index.d.ts", "dist/browser.d.ts");
+  writeFileSync("dist/index.d.ts", 'export * from "./express.js";\n');
+}
 
-    if (entry.isDirectory()) {
-      copyDeclarations(source, to);
-      continue;
-    }
+function cpDeclaration(source, target) {
+  mkdirSync(dirname(target), { recursive: true });
+  writeFileSync(target, readDeclaration(source));
+}
 
-    if (!entry.name.endsWith(".d.ts")) continue;
-    mkdirSync(dirname(target), { recursive: true });
-    cpSync(source, target);
-  }
+function readDeclaration(source) {
+  return readFileSync(source, "utf8").replaceAll("../types.js", "./types.js");
 }
 
 export default entries.map(([input, file], index) => ({

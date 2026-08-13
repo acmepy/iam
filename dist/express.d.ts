@@ -2,9 +2,9 @@ import type {
   AuthStrategy,
   ExpressAuthOptions,
   ExpressMiddleware
-} from "../types.js";
+} from "./types.js";
 
-export type { AuthStrategy, ExpressAuthOptions, ExpressMiddleware } from "../types.js";
+export type { AuthStrategy, ExpressAuthOptions, ExpressMiddleware } from "./types.js";
 
 export type PermissionMiddleware = ExpressMiddleware & {
   permission: string;

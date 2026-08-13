@@ -38,7 +38,7 @@
     "example:express": "node examples/express.js",
     "example:auditable": "node examples/auditable.js",
     "test": "node --test",
-    "lint": "eslint src example"
+    "lint": "eslint src examples"
   },
   "keywords": [
     "iam",

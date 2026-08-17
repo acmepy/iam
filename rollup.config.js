@@ -2,6 +2,8 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 const entries = [
+  ["src/index.js", "dist/index.js"],
+  ["src/adapters/index.js", "dist/adapters.js"],
   ["src/express/index.js", "dist/express.js"],
   ["src/docs/index.js", "dist/docs.js"],
   ["src/browser/index.js", "dist/browser.js"]
@@ -20,10 +22,11 @@ function declarations() {
 }
 
 function writeDeclarations() {
+  cpDeclaration("src/index.d.ts", "dist/index.d.ts");
+  cpDeclaration("src/adapters/index.d.ts", "dist/adapters.d.ts");
   cpDeclaration("src/express/index.d.ts", "dist/express.d.ts");
   cpDeclaration("src/docs/index.d.ts", "dist/docs.d.ts");
   cpDeclaration("src/browser/index.d.ts", "dist/browser.d.ts");
-  writeFileSync("dist/index.d.ts", 'export * from "./express.js";\n');
 }
 
 function cpDeclaration(source, target) {

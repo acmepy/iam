@@ -12,11 +12,11 @@ export class SeqAdapter {
   }
 
   async findUserByUsername(username) {
-    return normalize(await this.models.User.findOne({where: {[Op.or]: [{ id: username },{ email: username },{ name: username }]}}));
+    return (await this.models.User.findOne({where: {[Op.or]: [{ id: username }, { email: username }, { name: username }]}}))?.get() ?? null;
   }
 
   async findUserById(id) {
-    return normalize(await this.models.User.findByPk(id));
+    return (await this.models.User.findByPk(id))?.get() ?? null;
   }
 
   async verifyPassword(user, password) {
@@ -28,29 +28,29 @@ export class SeqAdapter {
     const values = {id: session.id ?? createSessionId(), ...session};
 
     const created = await this.models.Session.create(values);
-    const next = normalize(created);
+    const next = created.get();
     await writeAudit(this.auditable, { action: "create", rowId: next?.id, old: {}, new: next });
     return next;
   }
 
   async findSessionById(id) {
-    return normalize(await this.models.Session.findByPk(id));
+    return (await this.models.Session.findByPk(id))?.get() ?? null;
   }
 
   async findSessionByToken(token) {
-    return normalize(await this.models.Session.findOne({ where: { token } }));
+    return (await this.models.Session.findOne({ where: { token } }))?.get() ?? null;
   }
 
   async findActiveSessionByUserId(userId) {
-    return normalize(await this.models.Session.findOne({where: { userId, active: true }}));
+    return (await this.models.Session.findOne({where: { userId, active: true }}))?.get() ?? null;
   }
 
   async deactivateSession(id) {
     const session = await this.models.Session.findByPk(id);
     if (!session) return null;
-    const previous = normalize(session);
+    const previous = session.get();
     await session.update({ active: false, updatedAt: now() });
-    const next = normalize(session);
+    const next = session.get();
     await writeAudit(this.auditable, { action: "update", rowId: id, old: previous, new: next });
     return next;
   }
@@ -58,9 +58,9 @@ export class SeqAdapter {
   async updateSession(id, values) {
     const session = await this.models.Session.findByPk(id);
     if (!session) return null;
-    const previous = normalize(session);
+    const previous = session.get();
     await session.update(values);
-    const next = normalize(session);
+    const next = session.get();
     await writeAudit(this.auditable, { action: "update", rowId: id, old: previous, new: next });
     return next;
   }
@@ -69,8 +69,8 @@ export class SeqAdapter {
     const userRoles = await this.models.UserRole.findAll({where: { userId, active: true }});
     const roleIds = userRoles.map((item) => item.getDataValue("roleId"));
     if (roleIds.length === 0) return [];
-    const roles = await this.models.Role.findAll({where: {id: { [Op.in]: roleIds },active: true}});
-    return roles.map(normalize);
+    const roles = await Promise.all(roleIds.map((id) => this.models.Role.findOne({ where: { id, active: true } })));
+    return roles.filter(Boolean).map((role) => role.get());
   }
 
   async findPermissionsByUserId(userId, permission) {
@@ -115,16 +115,11 @@ async function writeAudit(auditable, change) {
   });
 }
 
-function normalize(model) {
-  if (!model)  return null;
-  return typeof model.get === "function" ? model.get() : model;
-}
-
 function uniqueNormalized(models) {
   const seen = new Set();
   const result = [];
   for (const model of models) {
-    const item = normalize(model);
+    const item = model.get();
     if (!item || seen.has(item.id)) continue;
     seen.add(item.id);
     result.push(item);

@@ -188,20 +188,13 @@ function auth(options = {}) {
 
   return async function iamAuth(req, res, next) {
     try {
-      if (matches(req, "POST", "/login")) {
-        return handleLogin(req, res, { authCore, jwt, options });
-      }
-
+      if (matches(req, "POST", "/login")) return handleLogin(req, res, { authCore, jwt, options });
       if (matches(req, "GET", "/session")) {
         const session = await authenticateRequest(req, { authCore, jwt, options });
         attach(req, { authCore, rbac, session });
         return sendData(res, session);
       }
-
-      if (matches(req, "POST", "/logout")) {
-        return handleLogout(req, res, { authCore, jwt, options, rbac });
-      }
-
+      if (matches(req, "POST", "/logout")) return handleLogout(req, res, { authCore, jwt, options, rbac });
       const session = await authenticateRequest(req, { authCore, jwt, options });
       attach(req, { authCore, rbac, session });
       return next();
@@ -357,9 +350,7 @@ async function createPublicSession(authCore, session, user) {
   const permissions = await authCore.rbac.getPermissions(user.id);
   return publicSession(session, user, {
     permissions: Array.from(new Set(
-      permissions
-        .filter((item) => item?.active !== false && item.permission)
-        .map((item) => item.permission)
+      permissions.filter((item) => item?.active !== false && item.permission).map((item) => item.permission)
     ))
   });
 }

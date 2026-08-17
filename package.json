@@ -1,6 +1,6 @@
 {
   "name": "iam",
-  "version": "0.6.5",
+  "version": "0.6.7",
   "description": "Small IAM authentication, authorization, and session library for JavaScript.",
   "type": "module",
   "main": "./dist/express.js",
@@ -11,8 +11,12 @@
   ],
   "exports": {
     ".": {
-      "types": "./dist/express.d.ts",
-      "import": "./dist/express.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./adapters": {
+      "types": "./dist/adapters.d.ts",
+      "import": "./dist/adapters.js"
     },
     "./express": {
       "types": "./dist/express.d.ts",

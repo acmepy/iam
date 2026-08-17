@@ -31,7 +31,7 @@ export function auth(options = {}) {
 
   return async function iamAuth(req, res, next) {
     try {
-      if (matches(req, "POST", "/login")) return handleLogin(req, res, { authCore, jwt, options });
+      if (matches(req, "POST", "/login")) return handleLogin(req, res, next, { authCore, jwt, options });
       if (matches(req, "GET", "/session")) {
         const session = await authenticateRequest(req, { authCore, jwt, options });
         attach(req, { authCore, rbac, session });
@@ -42,12 +42,13 @@ export function auth(options = {}) {
       attach(req, { authCore, rbac, session });
       return next();
     } catch (error) {
+      if (!(Number(error?.status ?? 500) < 500)) return next(error);
       return sendError(res, error, shouldChallenge(error, req));
     }
   };
 }
 
-async function handleLogin(req, res, { authCore, jwt, options }) {
+async function handleLogin(req, res, next, { authCore, jwt, options }) {
   try {
     const credentials = credentialsFromBody(req) ?? credentialsFromBasicHeader(req, options);
     if (!credentials) throw new AuthRequiredError();
@@ -60,6 +61,7 @@ async function handleLogin(req, res, { authCore, jwt, options }) {
 
     return sendData(res, { ...publicValue, token, expiresIn });
   } catch (error) {
+    if (!shouldSendError(error)) return next(error);
     return sendLoginError(res, error, req);
   }
 }
@@ -294,6 +296,10 @@ function sendData(res, data) {
 
 function errorResponse(error, message) {
   return {ok: false, message, stack: error.stack};
+}
+
+function shouldSendError(error) {
+  return Number(error?.status ?? 500) < 500;
 }
 
 function loginErrorDetails(error, req) {

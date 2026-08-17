@@ -25,6 +25,7 @@ export function can(permission) {
 
       return next();
     } catch (error) {
+      if (!(Number(error?.status ?? 500) < 500)) return next(error);
       return sendError(res, error);
     }
   }

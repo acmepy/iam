@@ -3,6 +3,7 @@ import test from "node:test";
 import { SignJWT } from "jose";
 import { MemoryAdapter } from "../src/adapters/index.js";
 import { auth, can } from "../src/express/index.js";
+import { getContext } from "../src/express/context.js";
 
 const secret = "secret";
 
@@ -168,6 +169,33 @@ test("post login returns json details for missing credentials", async () => {
   assert.equal(typeof res.body.stack, "string");
 });
 
+test("post login forwards internal errors to next", async () => {
+  const error = new Error("database down");
+  const adapter = {
+    ...createAdapter(),
+    async findUserByUsername() {
+      throw error;
+    }
+  };
+  const req = createRequest({
+    method: "POST",
+    path: "/login",
+    body: {
+      username: "admin",
+      password: "1234"
+    }
+  });
+  const res = createResponse();
+  let forwarded = null;
+
+  await auth({ adapter, jwt: { secret } })(req, res, (err) => {
+    forwarded = err;
+  });
+
+  assert.equal(forwarded, error);
+  assert.equal(res.body, null);
+});
+
 test("post login returns public session with jwt token and expiresIn", async () => {
   const adapter = createAdapter();
   const req = createRequest({
@@ -293,6 +321,32 @@ test("can rejects missing permissions", async () => {
   assert.equal(res.body.ok, false);
   assert.equal(res.body.message, "No tiene permisos para realizar esta acción");
   assert.equal(typeof res.body.stack, "string");
+});
+
+test("can forwards internal errors to next", async () => {
+  const error = new Error("rbac unavailable");
+  const req = createRequest({
+    method: "GET",
+    path: "/users",
+    headers: {
+      authorization: basic("admin", "1234")
+    }
+  });
+  const res = createResponse();
+  let forwarded = null;
+
+  await auth({ adapter: createAdapter(), jwt: { secret } })(req, res, async () => {
+    getContext(req).rbac.can = async () => {
+      throw error;
+    };
+
+    await can("users.list")(req, res, (err) => {
+      forwarded = err;
+    });
+  });
+
+  assert.equal(forwarded, error);
+  assert.equal(res.body, null);
 });
 
 async function loginWithPassword(adapter) {

@@ -55,15 +55,15 @@ export class SequelizeAdapter {
   }
 
   async findRolesByUserId(userId) {
-    const userRoles = await this.models.userRoles.findAll({where: { userId, active: true }});
-    const roleIds = userRoles.map((item) => item.roleId);
+    const usersRoles = await this.models.usersRoles.findAll({where: { userId, active: true }});
+    const roleIds = usersRoles.map((item) => item.roleId);
     if (roleIds.length === 0) return [];
     const roles = await this.models.roles.findAll({where: { id: roleIds, active: true}});
     return roles.map(normalize);
   }
 
   async findPermissionsByUserId(userId, permission) {
-    const userRoles = await this.models.userRoles.findAll({
+    const usersRoles = await this.models.usersRoles.findAll({
       where: { userId, active: true },
       attributes: ["roleId"],
       include: [{
@@ -74,7 +74,7 @@ export class SequelizeAdapter {
         required: true
       }]
     });
-    const assignedRoleIds = userRoles.map((item) => readValue(item, "roleId"));
+    const assignedRoleIds = usersRoles.map((item) => readValue(item, "roleId"));
     if (assignedRoleIds.length === 0) return [];
     const where = {active: true};
     if (permission) where.permission = permission;

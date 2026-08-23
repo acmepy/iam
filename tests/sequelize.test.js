@@ -6,7 +6,7 @@ test("SequelizeAdapter filters permissions with include", async () => {
   const calls = [];
   const adapter = new SequelizeAdapter({
     models: {
-      userRoles: {
+      usersRoles: {
         async findAll(options) {
           calls.push(["UserRole", options]);
           return [{ roleId: 1 }, { roleId: 2 }];

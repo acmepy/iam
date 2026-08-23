@@ -12,20 +12,20 @@ export function defineIamModels({ define, DataTypes, tableNames = {}, references
 }
 
 function associateIamModels(models) {
-  models.users.hasMany(models.userRoles, { foreignKey: "userId", as: "userRoles" });
+  models.users.hasMany(models.usersRoles, { foreignKey: "userId", as: "usersRoles" });
   models.users.hasMany(models.sessions, { foreignKey: "userId", as: "sessions" });
-  models.users.belongsToMany(models.roles, { through: models.userRoles, foreignKey: "userId", otherKey: "roleId", as: "roles" });
+  models.users.belongsToMany(models.roles, { through: models.usersRoles, foreignKey: "userId", otherKey: "roleId", as: "roles" });
 
-  models.roles.hasMany(models.userRoles, { foreignKey: "roleId", as: "userRoles" });
+  models.roles.hasMany(models.usersRoles, { foreignKey: "roleId", as: "usersRoles" });
   models.roles.hasMany(models.rolesPermissions, { foreignKey: "roleId", as: "rolesPermissions" });
-  models.roles.belongsToMany(models.users, { through: models.userRoles, foreignKey: "roleId", otherKey: "userId", as: "users" });
+  models.roles.belongsToMany(models.users, { through: models.usersRoles, foreignKey: "roleId", otherKey: "userId", as: "users" });
   models.roles.belongsToMany(models.permissions, { through: models.rolesPermissions, foreignKey: "roleId", otherKey: "permissionId", as: "permissions" });
 
   models.permissions.hasMany(models.rolesPermissions, { foreignKey: "permissionId", as: "rolesPermissions" });
   models.permissions.belongsToMany(models.roles, { through: models.rolesPermissions, foreignKey: "permissionId", otherKey: "roleId", as: "roles" });
 
-  models.userRoles.belongsTo(models.users, { foreignKey: "userId", as: "user" });
-  models.userRoles.belongsTo(models.roles, { foreignKey: "roleId", as: "role" });
+  models.usersRoles.belongsTo(models.users, { foreignKey: "userId", as: "user" });
+  models.usersRoles.belongsTo(models.roles, { foreignKey: "roleId", as: "role" });
 
   models.rolesPermissions.belongsTo(models.roles, { foreignKey: "roleId", as: "role" });
   models.rolesPermissions.belongsTo(models.permissions, { foreignKey: "permissionId", as: "permission" });
@@ -63,7 +63,7 @@ const modelDefinitions = [
     }
   },
   {
-    name: "userRoles",
+    name: "usersRoles",
     attributes: {
       id: { type: "integer", primaryKey: true, autoIncrement: true },
       userId: { type: "string", length: 100, allowNull: false, references: { model: "users", key: "id" } },

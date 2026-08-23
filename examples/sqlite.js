@@ -59,7 +59,7 @@ async function seed(models) {
     active: true
   });
 
-  await models.userRoles.create({
+  await models.usersRoles.create({
     userId: "admin",
     roleId: role.getDataValue("id"),
     active: true

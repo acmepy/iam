@@ -28,7 +28,7 @@ const adapter = new MemoryAdapter({
   ],
   roles: [{ id: 1, role: "admin", active: true }],
   permissions: [{ id: 1, permission: "users.list", active: true }],
-  userRoles: [{ id: 1, userId: "admin", roleId: 1, active: true }],
+  usersRoles: [{ id: 1, userId: "admin", roleId: 1, active: true }],
   rolesPermissions: [{ id: 1, roleId: 1, permissionId: 1, active: true }]
 });
 
@@ -280,7 +280,7 @@ const adapter = new SeqAdapter({
     users,
     roles,
     permissions,
-    userRoles,
+    usersRoles,
     rolesPermissions,
     sessions
   }
@@ -296,14 +296,14 @@ const adapter = new SeqAdapter({
     users: "iam_users",
     roles: "iam_roles",
     permissions: "iam_permissions",
-    userRoles: "iam_user_roles",
+    usersRoles: "iam_user_roles",
     rolesPermissions: "iam_role_permissions",
     sessions: "iam_sessions"
   }
 });
 ```
 
-Las claves de `models` y `tableNames` corresponden a los modelos internos de IAM: `users`, `roles`, `permissions`, `userRoles`, `rolesPermissions` y `sessions`.
+Las claves de `models` y `tableNames` corresponden a los modelos internos de IAM: `users`, `roles`, `permissions`, `usersRoles`, `rolesPermissions` y `sessions`.
 
 ## Exportaciones
 

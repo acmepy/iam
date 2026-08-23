@@ -66,8 +66,8 @@ export class SeqAdapter {
   }
 
   async findRolesByUserId(userId) {
-    const userRoles = await this.models.userRoles.findAll({where: { userId, active: true }});
-    const roleIds = userRoles.map((item) => item.getDataValue("roleId"));
+    const usersRoles = await this.models.usersRoles.findAll({where: { userId, active: true }});
+    const roleIds = usersRoles.map((item) => item.getDataValue("roleId"));
     if (roleIds.length === 0) return [];
     const roles = await Promise.all(roleIds.map((id) => this.models.roles.findOne({ where: { id, active: true } })));
     return roles.filter(Boolean).map((role) => role.get());
@@ -88,7 +88,7 @@ export class SeqAdapter {
           where: { active: true },
           attributes: ["id"],
           required: true,
-          include: {model: this.models.userRoles, as: "userRoles", where: { userId, active: true }, attributes: ["id"], required: true}
+          include: {model: this.models.usersRoles, as: "usersRoles", where: { userId, active: true }, attributes: ["id"], required: true}
         }
       ]
     });

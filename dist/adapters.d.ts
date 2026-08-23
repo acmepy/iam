@@ -17,7 +17,7 @@ export class MemoryAdapter implements Adapter {
   users: UserData[];
   roles: RoleData[];
   permissions: PermissionData[];
-  userRoles: UserRoleData[];
+  usersRoles: UserRoleData[];
   rolesPermissions: RolePermissionData[];
   sessions: SessionData[];
   findUserByUsername(username: string): Promise<UserData | null>;

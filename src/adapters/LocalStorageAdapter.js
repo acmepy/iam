@@ -31,7 +31,7 @@ export class LocalStorageAdapter extends MemoryAdapter {
 
   save() {
     if (!this.storage) throw new AdapterError("localStorage no está disponible");
-    this.storage.setItem(this.key, JSON.stringify({users: this.users, roles: this.roles, permissions: this.permissions, userRoles: this.userRoles, rolesPermissions: this.rolesPermissions, sessions: this.sessions}));
+    this.storage.setItem(this.key, JSON.stringify({users: this.users, roles: this.roles, permissions: this.permissions, usersRoles: this.usersRoles, rolesPermissions: this.rolesPermissions, sessions: this.sessions}));
   }
 }
 

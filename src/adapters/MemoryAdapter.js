@@ -1,6 +1,6 @@
 import { now } from "../core/utils.js";
 
-const collections = ["users", "roles", "permissions", "userRoles", "rolesPermissions", "sessions"];
+const collections = ["users", "roles", "permissions", "usersRoles", "rolesPermissions", "sessions"];
 
 /**
  * In-memory IAM adapter, useful for tests, demos, and small embedded setups.
@@ -58,7 +58,7 @@ export class MemoryAdapter {
   }
 
   async findRolesByUserId(userId) {
-    const roleIds = this.userRoles.filter((userRole) => userRole.userId === userId && userRole.active !== false).map((userRole) => userRole.roleId);
+    const roleIds = this.usersRoles.filter((userRole) => userRole.userId === userId && userRole.active !== false).map((userRole) => userRole.roleId);
     return this.roles.filter((role) => roleIds.includes(role.id) && role.active !== false);
   }
 

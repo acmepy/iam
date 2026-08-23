@@ -182,7 +182,7 @@ class RolePermission {
   }
 }
 
-const collections$1 = ["users", "roles", "permissions", "userRoles", "rolesPermissions", "sessions"];
+const collections$1 = ["users", "roles", "permissions", "usersRoles", "rolesPermissions", "sessions"];
 
 /**
  * In-memory IAM adapter, useful for tests, demos, and small embedded setups.
@@ -240,7 +240,7 @@ class MemoryAdapter {
   }
 
   async findRolesByUserId(userId) {
-    const roleIds = this.userRoles.filter((userRole) => userRole.userId === userId && userRole.active !== false).map((userRole) => userRole.roleId);
+    const roleIds = this.usersRoles.filter((userRole) => userRole.userId === userId && userRole.active !== false).map((userRole) => userRole.roleId);
     return this.roles.filter((role) => roleIds.includes(role.id) && role.active !== false);
   }
 
@@ -282,7 +282,7 @@ class LocalStorageAdapter extends MemoryAdapter {
 
   save() {
     if (!this.storage) throw new AdapterError("localStorage no está disponible");
-    this.storage.setItem(this.key, JSON.stringify({users: this.users, roles: this.roles, permissions: this.permissions, userRoles: this.userRoles, rolesPermissions: this.rolesPermissions, sessions: this.sessions}));
+    this.storage.setItem(this.key, JSON.stringify({users: this.users, roles: this.roles, permissions: this.permissions, usersRoles: this.usersRoles, rolesPermissions: this.rolesPermissions, sessions: this.sessions}));
   }
 }
 
@@ -292,7 +292,7 @@ function load(storage, key) {
   return value ? JSON.parse(value) : null;
 }
 
-const collections = ["users", "roles", "permissions", "userRoles", "rolesPermissions", "sessions"];
+const collections = ["users", "roles", "permissions", "usersRoles", "rolesPermissions", "sessions"];
 const defaultDbName = "iam";
 const defaultStoreName = "collections";
 
@@ -395,20 +395,20 @@ function defineIamModels({ define, DataTypes, tableNames = {}, references = fals
 }
 
 function associateIamModels(models) {
-  models.users.hasMany(models.userRoles, { foreignKey: "userId", as: "userRoles" });
+  models.users.hasMany(models.usersRoles, { foreignKey: "userId", as: "usersRoles" });
   models.users.hasMany(models.sessions, { foreignKey: "userId", as: "sessions" });
-  models.users.belongsToMany(models.roles, { through: models.userRoles, foreignKey: "userId", otherKey: "roleId", as: "roles" });
+  models.users.belongsToMany(models.roles, { through: models.usersRoles, foreignKey: "userId", otherKey: "roleId", as: "roles" });
 
-  models.roles.hasMany(models.userRoles, { foreignKey: "roleId", as: "userRoles" });
+  models.roles.hasMany(models.usersRoles, { foreignKey: "roleId", as: "usersRoles" });
   models.roles.hasMany(models.rolesPermissions, { foreignKey: "roleId", as: "rolesPermissions" });
-  models.roles.belongsToMany(models.users, { through: models.userRoles, foreignKey: "roleId", otherKey: "userId", as: "users" });
+  models.roles.belongsToMany(models.users, { through: models.usersRoles, foreignKey: "roleId", otherKey: "userId", as: "users" });
   models.roles.belongsToMany(models.permissions, { through: models.rolesPermissions, foreignKey: "roleId", otherKey: "permissionId", as: "permissions" });
 
   models.permissions.hasMany(models.rolesPermissions, { foreignKey: "permissionId", as: "rolesPermissions" });
   models.permissions.belongsToMany(models.roles, { through: models.rolesPermissions, foreignKey: "permissionId", otherKey: "roleId", as: "roles" });
 
-  models.userRoles.belongsTo(models.users, { foreignKey: "userId", as: "user" });
-  models.userRoles.belongsTo(models.roles, { foreignKey: "roleId", as: "role" });
+  models.usersRoles.belongsTo(models.users, { foreignKey: "userId", as: "user" });
+  models.usersRoles.belongsTo(models.roles, { foreignKey: "roleId", as: "role" });
 
   models.rolesPermissions.belongsTo(models.roles, { foreignKey: "roleId", as: "role" });
   models.rolesPermissions.belongsTo(models.permissions, { foreignKey: "permissionId", as: "permission" });
@@ -446,7 +446,7 @@ const modelDefinitions = [
     }
   },
   {
-    name: "userRoles",
+    name: "usersRoles",
     attributes: {
       id: { type: "integer", primaryKey: true, autoIncrement: true },
       userId: { type: "string", length: 100, allowNull: false, references: { model: "users", key: "id" } },
@@ -546,15 +546,15 @@ class SequelizeAdapter {
   }
 
   async findRolesByUserId(userId) {
-    const userRoles = await this.models.userRoles.findAll({where: { userId, active: true }});
-    const roleIds = userRoles.map((item) => item.roleId);
+    const usersRoles = await this.models.usersRoles.findAll({where: { userId, active: true }});
+    const roleIds = usersRoles.map((item) => item.roleId);
     if (roleIds.length === 0) return [];
     const roles = await this.models.roles.findAll({where: { id: roleIds, active: true}});
     return roles.map(normalize);
   }
 
   async findPermissionsByUserId(userId, permission) {
-    const userRoles = await this.models.userRoles.findAll({
+    const usersRoles = await this.models.usersRoles.findAll({
       where: { userId, active: true },
       attributes: ["roleId"],
       include: [{
@@ -565,7 +565,7 @@ class SequelizeAdapter {
         required: true
       }]
     });
-    const assignedRoleIds = userRoles.map((item) => readValue(item, "roleId"));
+    const assignedRoleIds = usersRoles.map((item) => readValue(item, "roleId"));
     if (assignedRoleIds.length === 0) return [];
     const where = {active: true};
     if (permission) where.permission = permission;
@@ -677,8 +677,8 @@ class SeqAdapter {
   }
 
   async findRolesByUserId(userId) {
-    const userRoles = await this.models.userRoles.findAll({where: { userId, active: true }});
-    const roleIds = userRoles.map((item) => item.getDataValue("roleId"));
+    const usersRoles = await this.models.usersRoles.findAll({where: { userId, active: true }});
+    const roleIds = usersRoles.map((item) => item.getDataValue("roleId"));
     if (roleIds.length === 0) return [];
     const roles = await Promise.all(roleIds.map((id) => this.models.roles.findOne({ where: { id, active: true } })));
     return roles.filter(Boolean).map((role) => role.get());
@@ -699,7 +699,7 @@ class SeqAdapter {
           where: { active: true },
           attributes: ["id"],
           required: true,
-          include: {model: this.models.userRoles, as: "userRoles", where: { userId, active: true }, attributes: ["id"], required: true}
+          include: {model: this.models.usersRoles, as: "usersRoles", where: { userId, active: true }, attributes: ["id"], required: true}
         }
       ]
     });

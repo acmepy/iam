@@ -1,7 +1,7 @@
 import { AdapterError } from "../core/errors.js";
 import { MemoryAdapter } from "./MemoryAdapter.js";
 
-const collections = ["users", "roles", "permissions", "userRoles", "rolesPermissions", "sessions"];
+const collections = ["users", "roles", "permissions", "usersRoles", "rolesPermissions", "sessions"];
 const defaultDbName = "iam";
 const defaultStoreName = "collections";
 

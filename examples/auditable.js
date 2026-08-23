@@ -69,7 +69,7 @@ function jsonSafe(value) {
 }
 
 async function seed(models) {
-  await models.User.create({
+  await models.users.create({
     id: "admin",
     password: "1234",
     name: "Administrador",

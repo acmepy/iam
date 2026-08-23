@@ -47,21 +47,21 @@ test("SeqAdapter accepts custom IAM table names", () => {
   const adapter = new SeqAdapter({
     seq,
     tableNames: {
-      User: "iam_users",
-      Role: "iam_roles",
-      Permission: "iam_permissions",
-      UserRole: "iam_user_roles",
-      RolePermission: "iam_role_permissions",
-      Session: "iam_sessions"
+      users: "iam_users",
+      roles: "iam_roles",
+      permissions: "iam_permissions",
+      userRoles: "iam_user_roles",
+      rolesPermissions: "iam_role_permissions",
+      sessions: "iam_sessions"
     }
   });
 
-  assert.equal(adapter.models.User.tableName, "iam_users");
-  assert.equal(adapter.models.Role.tableName, "iam_roles");
-  assert.equal(adapter.models.Permission.tableName, "iam_permissions");
-  assert.equal(adapter.models.UserRole.tableName, "iam_user_roles");
-  assert.equal(adapter.models.RolePermission.tableName, "iam_role_permissions");
-  assert.equal(adapter.models.Session.tableName, "iam_sessions");
+  assert.equal(adapter.models.users.tableName, "iam_users");
+  assert.equal(adapter.models.roles.tableName, "iam_roles");
+  assert.equal(adapter.models.permissions.tableName, "iam_permissions");
+  assert.equal(adapter.models.userRoles.tableName, "iam_user_roles");
+  assert.equal(adapter.models.rolesPermissions.tableName, "iam_role_permissions");
+  assert.equal(adapter.models.sessions.tableName, "iam_sessions");
 });
 
 test("SeqAdapter can emit auditable session changes", async () => {
@@ -73,7 +73,7 @@ test("SeqAdapter can emit auditable session changes", async () => {
   try {
     await seq.init();
     await seq.sync();
-    await adapter.models.User.create({
+    await adapter.models.users.create({
       id: "admin",
       password: "1234",
       name: "Administrador",
@@ -115,15 +115,15 @@ test("SeqAdapter defines IAM foreign key references", async () => {
     await seq.init();
     await seq.sync();
 
-    assertReferences(seq, "UserRole", [
-      ["userId", "User", "id"],
-      ["roleId", "Role", "id"]
+    assertReferences(seq, "userRoles", [
+      ["userId", "users", "id"],
+      ["roleId", "roles", "id"]
     ]);
-    assertReferences(seq, "RolePermission", [
-      ["roleId", "Role", "id"],
-      ["permissionId", "Permission", "id"]
+    assertReferences(seq, "rolesPermissions", [
+      ["roleId", "roles", "id"],
+      ["permissionId", "permissions", "id"]
     ]);
-    assertReferences(seq, "Session", [["userId", "User", "id"]]);
+    assertReferences(seq, "sessions", [["userId", "users", "id"]]);
   } finally {
     await seq.close();
   }
@@ -134,23 +134,23 @@ test("SeqAdapter associates IAM models", () => {
   const seq = new Seq({ adapter: sqlite, logging: false });
   const { models } = new SeqAdapter({ seq });
 
-  assertAssociation(models.User, "userRoles", "hasMany", models.UserRole, "userId");
-  assertAssociation(models.User, "sessions", "hasMany", models.Session, "userId");
-  assertAssociation(models.User, "roles", "belongsToMany", models.Role, "userId", "roleId");
+  assertAssociation(models.users, "userRoles", "hasMany", models.userRoles, "userId");
+  assertAssociation(models.users, "sessions", "hasMany", models.sessions, "userId");
+  assertAssociation(models.users, "roles", "belongsToMany", models.roles, "userId", "roleId");
 
-  assertAssociation(models.Role, "userRoles", "hasMany", models.UserRole, "roleId");
-  assertAssociation(models.Role, "rolePermissions", "hasMany", models.RolePermission, "roleId");
-  assertAssociation(models.Role, "users", "belongsToMany", models.User, "roleId", "userId");
-  assertAssociation(models.Role, "permissions", "belongsToMany", models.Permission, "roleId", "permissionId");
+  assertAssociation(models.roles, "userRoles", "hasMany", models.userRoles, "roleId");
+  assertAssociation(models.roles, "rolesPermissions", "hasMany", models.rolesPermissions, "roleId");
+  assertAssociation(models.roles, "users", "belongsToMany", models.users, "roleId", "userId");
+  assertAssociation(models.roles, "permissions", "belongsToMany", models.permissions, "roleId", "permissionId");
 
-  assertAssociation(models.Permission, "rolePermissions", "hasMany", models.RolePermission, "permissionId");
-  assertAssociation(models.Permission, "roles", "belongsToMany", models.Role, "permissionId", "roleId");
+  assertAssociation(models.permissions, "rolesPermissions", "hasMany", models.rolesPermissions, "permissionId");
+  assertAssociation(models.permissions, "roles", "belongsToMany", models.roles, "permissionId", "roleId");
 
-  assertAssociation(models.UserRole, "user", "belongsTo", models.User, "userId");
-  assertAssociation(models.UserRole, "role", "belongsTo", models.Role, "roleId");
-  assertAssociation(models.RolePermission, "role", "belongsTo", models.Role, "roleId");
-  assertAssociation(models.RolePermission, "permission", "belongsTo", models.Permission, "permissionId");
-  assertAssociation(models.Session, "user", "belongsTo", models.User, "userId");
+  assertAssociation(models.userRoles, "user", "belongsTo", models.users, "userId");
+  assertAssociation(models.userRoles, "role", "belongsTo", models.roles, "roleId");
+  assertAssociation(models.rolesPermissions, "role", "belongsTo", models.roles, "roleId");
+  assertAssociation(models.rolesPermissions, "permission", "belongsTo", models.permissions, "permissionId");
+  assertAssociation(models.sessions, "user", "belongsTo", models.users, "userId");
 });
 
 test("SeqAdapter filters permissions with include", async () => {
@@ -163,8 +163,8 @@ test("SeqAdapter filters permissions with include", async () => {
     await seq.sync();
     await seedPermissionFiltering(adapter.models);
     const calls = [];
-    const rolePermissionFindAll = adapter.models.RolePermission.findAll.bind(adapter.models.RolePermission);
-    adapter.models.RolePermission.findAll = (options) => {
+    const rolePermissionFindAll = adapter.models.rolesPermissions.findAll.bind(adapter.models.rolesPermissions);
+    adapter.models.rolesPermissions.findAll = (options) => {
       calls.push(["RolePermission", options]);
       return rolePermissionFindAll(options);
     };
@@ -179,9 +179,9 @@ test("SeqAdapter filters permissions with include", async () => {
     );
     assert.deepEqual(await adapter.findPermissionsByUserId("admin", "users.delete"), []);
     assert.ok(calls.every(([model]) => model === "RolePermission"));
-    assert.ok(calls.some(([, options]) => includedModels(options).includes(adapter.models.Permission)));
-    assert.ok(calls.some(([, options]) => includedModels(options).includes(adapter.models.Role)));
-    assert.ok(calls.some(([, options]) => nestedIncludedModels(options).includes(adapter.models.UserRole)));
+    assert.ok(calls.some(([, options]) => includedModels(options).includes(adapter.models.permissions)));
+    assert.ok(calls.some(([, options]) => includedModels(options).includes(adapter.models.roles)));
+    assert.ok(calls.some(([, options]) => nestedIncludedModels(options).includes(adapter.models.userRoles)));
   } finally {
     await seq.close();
   }
@@ -219,7 +219,7 @@ test("express middleware can use SeqAdapter", async () => {
 });
 
 async function seed(models) {
-  await models.User.create({
+  await models.users.create({
     id: "admin",
     password: "1234",
     name: "Administrador",
@@ -227,19 +227,19 @@ async function seed(models) {
     options: {},
     active: true
   });
-  const role = await models.Role.create({ role: "admin", active: true });
-  const permission = await models.Permission.create({
+  const role = await models.roles.create({ role: "admin", active: true });
+  const permission = await models.permissions.create({
     permission: "users.list",
     title: "List users",
     active: true
   });
 
-  await models.UserRole.create({
+  await models.userRoles.create({
     userId: "admin",
     roleId: role.getDataValue("id"),
     active: true
   });
-  await models.RolePermission.create({
+  await models.rolesPermissions.create({
     roleId: role.getDataValue("id"),
     permissionId: permission.getDataValue("id"),
     active: true
@@ -247,7 +247,7 @@ async function seed(models) {
 }
 
 async function seedPermissionFiltering(models) {
-  await models.User.create({
+  await models.users.create({
     id: "admin",
     password: "1234",
     name: "Administrador",
@@ -255,7 +255,7 @@ async function seedPermissionFiltering(models) {
     options: {},
     active: true
   });
-  await models.User.create({
+  await models.users.create({
     id: "other",
     password: "1234",
     name: "Otro",
@@ -263,67 +263,67 @@ async function seedPermissionFiltering(models) {
     options: {},
     active: true
   });
-  const adminRole = await models.Role.create({ role: "admin", active: true });
-  const editorRole = await models.Role.create({ role: "editor", active: true });
-  const inactiveRole = await models.Role.create({ role: "inactive", active: false });
-  const otherRole = await models.Role.create({ role: "other", active: true });
-  const listPermission = await models.Permission.create({
+  const adminRole = await models.roles.create({ role: "admin", active: true });
+  const editorRole = await models.roles.create({ role: "editor", active: true });
+  const inactiveRole = await models.roles.create({ role: "inactive", active: false });
+  const otherRole = await models.roles.create({ role: "other", active: true });
+  const listPermission = await models.permissions.create({
     permission: "users.list",
     title: "List users",
     active: true
   });
-  const createPermission = await models.Permission.create({
+  const createPermission = await models.permissions.create({
     permission: "users.create",
     title: "Create users",
     active: true
   });
-  const inactivePermission = await models.Permission.create({
+  const inactivePermission = await models.permissions.create({
     permission: "users.inactive",
     title: "Inactive role permission",
     active: true
   });
-  const otherPermission = await models.Permission.create({
+  const otherPermission = await models.permissions.create({
     permission: "users.other",
     title: "Other user permission",
     active: true
   });
 
-  await models.UserRole.create({
+  await models.userRoles.create({
     userId: "admin",
     roleId: adminRole.getDataValue("id"),
     active: true
   });
-  await models.UserRole.create({
+  await models.userRoles.create({
     userId: "admin",
     roleId: editorRole.getDataValue("id"),
     active: true
   });
-  await models.UserRole.create({
+  await models.userRoles.create({
     userId: "admin",
     roleId: inactiveRole.getDataValue("id"),
     active: true
   });
-  await models.UserRole.create({
+  await models.userRoles.create({
     userId: "other",
     roleId: otherRole.getDataValue("id"),
     active: true
   });
-  await models.RolePermission.create({
+  await models.rolesPermissions.create({
     roleId: adminRole.getDataValue("id"),
     permissionId: listPermission.getDataValue("id"),
     active: true
   });
-  await models.RolePermission.create({
+  await models.rolesPermissions.create({
     roleId: editorRole.getDataValue("id"),
     permissionId: createPermission.getDataValue("id"),
     active: true
   });
-  await models.RolePermission.create({
+  await models.rolesPermissions.create({
     roleId: inactiveRole.getDataValue("id"),
     permissionId: inactivePermission.getDataValue("id"),
     active: true
   });
-  await models.RolePermission.create({
+  await models.rolesPermissions.create({
     roleId: otherRole.getDataValue("id"),
     permissionId: otherPermission.getDataValue("id"),
     active: true

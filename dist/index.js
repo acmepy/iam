@@ -182,7 +182,7 @@ class RolePermission {
   }
 }
 
-const collections$1 = ["users", "roles", "permissions", "userRoles", "rolePermissions", "sessions"];
+const collections$1 = ["users", "roles", "permissions", "userRoles", "rolesPermissions", "sessions"];
 
 /**
  * In-memory IAM adapter, useful for tests, demos, and small embedded setups.
@@ -247,7 +247,7 @@ class MemoryAdapter {
   async findPermissionsByUserId(userId, permission) {
     const roles = await this.findRolesByUserId(userId);
     const roleIds = roles.map((role) => role.id);
-    const permissionIds = this.rolePermissions.filter((rolePermission) => {return roleIds.includes(rolePermission.roleId) && rolePermission.active !== false}).map((rolePermission) => rolePermission.permissionId);
+    const permissionIds = this.rolesPermissions.filter((rolePermission) => {return roleIds.includes(rolePermission.roleId) && rolePermission.active !== false}).map((rolePermission) => rolePermission.permissionId);
     return this.permissions.filter((item) => {return permissionIds.includes(item.id) && item.active !== false && (!permission || item.permission === permission);});
   }
 }
@@ -282,7 +282,7 @@ class LocalStorageAdapter extends MemoryAdapter {
 
   save() {
     if (!this.storage) throw new AdapterError("localStorage no está disponible");
-    this.storage.setItem(this.key, JSON.stringify({users: this.users, roles: this.roles, permissions: this.permissions, userRoles: this.userRoles, rolePermissions: this.rolePermissions, sessions: this.sessions}));
+    this.storage.setItem(this.key, JSON.stringify({users: this.users, roles: this.roles, permissions: this.permissions, userRoles: this.userRoles, rolesPermissions: this.rolesPermissions, sessions: this.sessions}));
   }
 }
 
@@ -292,7 +292,7 @@ function load(storage, key) {
   return value ? JSON.parse(value) : null;
 }
 
-const collections = ["users", "roles", "permissions", "userRoles", "rolePermissions", "sessions"];
+const collections = ["users", "roles", "permissions", "userRoles", "rolesPermissions", "sessions"];
 const defaultDbName = "iam";
 const defaultStoreName = "collections";
 
@@ -395,31 +395,30 @@ function defineIamModels({ define, DataTypes, tableNames = {}, references = fals
 }
 
 function associateIamModels(models) {
-  models.User.hasMany(models.UserRole, { foreignKey: "userId", as: "userRoles" });
-  models.User.hasMany(models.Session, { foreignKey: "userId", as: "sessions" });
-  models.User.belongsToMany(models.Role, { through: models.UserRole, foreignKey: "userId", otherKey: "roleId", as: "roles" });
+  models.users.hasMany(models.userRoles, { foreignKey: "userId", as: "userRoles" });
+  models.users.hasMany(models.sessions, { foreignKey: "userId", as: "sessions" });
+  models.users.belongsToMany(models.roles, { through: models.userRoles, foreignKey: "userId", otherKey: "roleId", as: "roles" });
 
-  models.Role.hasMany(models.UserRole, { foreignKey: "roleId", as: "userRoles" });
-  models.Role.hasMany(models.RolePermission, { foreignKey: "roleId", as: "rolePermissions" });
-  models.Role.belongsToMany(models.User, { through: models.UserRole, foreignKey: "roleId", otherKey: "userId", as: "users" });
-  models.Role.belongsToMany(models.Permission, { through: models.RolePermission, foreignKey: "roleId", otherKey: "permissionId", as: "permissions" });
+  models.roles.hasMany(models.userRoles, { foreignKey: "roleId", as: "userRoles" });
+  models.roles.hasMany(models.rolesPermissions, { foreignKey: "roleId", as: "rolesPermissions" });
+  models.roles.belongsToMany(models.users, { through: models.userRoles, foreignKey: "roleId", otherKey: "userId", as: "users" });
+  models.roles.belongsToMany(models.permissions, { through: models.rolesPermissions, foreignKey: "roleId", otherKey: "permissionId", as: "permissions" });
 
-  models.Permission.hasMany(models.RolePermission, { foreignKey: "permissionId", as: "rolePermissions" });
-  models.Permission.belongsToMany(models.Role, { through: models.RolePermission, foreignKey: "permissionId", otherKey: "roleId", as: "roles" });
+  models.permissions.hasMany(models.rolesPermissions, { foreignKey: "permissionId", as: "rolesPermissions" });
+  models.permissions.belongsToMany(models.roles, { through: models.rolesPermissions, foreignKey: "permissionId", otherKey: "roleId", as: "roles" });
 
-  models.UserRole.belongsTo(models.User, { foreignKey: "userId", as: "user" });
-  models.UserRole.belongsTo(models.Role, { foreignKey: "roleId", as: "role" });
+  models.userRoles.belongsTo(models.users, { foreignKey: "userId", as: "user" });
+  models.userRoles.belongsTo(models.roles, { foreignKey: "roleId", as: "role" });
 
-  models.RolePermission.belongsTo(models.Role, { foreignKey: "roleId", as: "role" });
-  models.RolePermission.belongsTo(models.Permission, { foreignKey: "permissionId", as: "permission" });
+  models.rolesPermissions.belongsTo(models.roles, { foreignKey: "roleId", as: "role" });
+  models.rolesPermissions.belongsTo(models.permissions, { foreignKey: "permissionId", as: "permission" });
 
-  models.Session.belongsTo(models.User, { foreignKey: "userId", as: "user" });
+  models.sessions.belongsTo(models.users, { foreignKey: "userId", as: "user" });
 }
 
 const modelDefinitions = [
   {
-    name: "User",
-    //tableName: "users",
+    name: "users",
     attributes: {
       id: { type: "string", length: 100, primaryKey: true, allowNull: false },
       password: { type: "string", length: 255, allowNull: false },
@@ -430,8 +429,7 @@ const modelDefinitions = [
     }
   },
   {
-    name: "Role",
-    //tableName: "roles",
+    name: "roles",
     attributes: {
       id: { type: "integer", primaryKey: true, autoIncrement: true },
       role: { type: "string", length: 100, allowNull: false },
@@ -439,8 +437,7 @@ const modelDefinitions = [
     }
   },
   {
-    name: "Permission",
-    //tableName: "permissions",
+    name: "permissions",
     attributes: {
       id: { type: "integer", primaryKey: true, autoIncrement: true },
       permission: { type: "string", length: 150, allowNull: false },
@@ -449,31 +446,28 @@ const modelDefinitions = [
     }
   },
   {
-    name: "UserRole",
-    //tableName: "user_roles",
+    name: "userRoles",
     attributes: {
       id: { type: "integer", primaryKey: true, autoIncrement: true },
-      userId: { type: "string", length: 100, allowNull: false, references: { model: "User", key: "id" } },
-      roleId: { type: "integer", allowNull: false, references: { model: "Role", key: "id" } },
+      userId: { type: "string", length: 100, allowNull: false, references: { model: "users", key: "id" } },
+      roleId: { type: "integer", allowNull: false, references: { model: "roles", key: "id" } },
       active: { type: "boolean", allowNull: false, defaultValue: true }
     }
   },
   {
-    name: "RolePermission",
-    //tableName: "role_permissions",
+    name: "rolesPermissions",
     attributes: {
       id: { type: "integer", primaryKey: true, autoIncrement: true },
-      roleId: { type: "integer", allowNull: false, references: { model: "Role", key: "id" } },
-      permissionId: { type: "integer", allowNull: false, references: { model: "Permission", key: "id" } },
+      roleId: { type: "integer", allowNull: false, references: { model: "roles", key: "id" } },
+      permissionId: { type: "integer", allowNull: false, references: { model: "permissions", key: "id" } },
       active: { type: "boolean", allowNull: false, defaultValue: true }
     }
   },
   {
-    name: "Session",
-    //tableName: "sessions",
+    name: "sessions",
     attributes: {
       id: { type: "string", length: 100, primaryKey: true, allowNull: false },
-      userId: { type: "string", length: 100, allowNull: false, references: { model: "User", key: "id" } },
+      userId: { type: "string", length: 100, allowNull: false, references: { model: "users", key: "id" } },
       token: { type: "string", length: 500, allowNull: true },
       options: { type: "json", allowNull: true, defaultValue: () => ({}) },
       active: { type: "boolean", allowNull: false, defaultValue: true }
@@ -507,11 +501,11 @@ class SequelizeAdapter {
   }
 
   async findUserByUsername(username) {
-    return normalize(await this.models.User.findOne({where: {[this.opOr()]: [{ id: username }, { email: username }, { name: username }]}}));
+    return normalize(await this.models.users.findOne({where: {[this.opOr()]: [{ id: username }, { email: username }, { name: username }]}}));
   }
 
   async findUserById(id) {
-    return normalize(await this.models.User.findByPk(id));
+    return normalize(await this.models.users.findByPk(id));
   }
 
   async verifyPassword(user, password) {
@@ -522,49 +516,49 @@ class SequelizeAdapter {
   async createSession(session) {
     const values = { id: session.id ?? createSessionId(), ...session};
 
-    return normalize(await this.models.Session.create(values));
+    return normalize(await this.models.sessions.create(values));
   }
 
   async findSessionById(id) {
-    return normalize(await this.models.Session.findByPk(id));
+    return normalize(await this.models.sessions.findByPk(id));
   }
 
   async findSessionByToken(token) {
-    return normalize(await this.models.Session.findOne({ where: { token } }));
+    return normalize(await this.models.sessions.findOne({ where: { token } }));
   }
 
   async findActiveSessionByUserId(userId) {
-    return normalize(await this.models.Session.findOne({where: { userId, active: true }}));
+    return normalize(await this.models.sessions.findOne({where: { userId, active: true }}));
   }
 
   async deactivateSession(id) {
-    const session = await this.models.Session.findByPk(id);
+    const session = await this.models.sessions.findByPk(id);
     if (!session) return null;
     await session.update({ active: false, updatedAt: now() });
     return normalize(session);
   }
 
   async updateSession(id, values) {
-    const session = await this.models.Session.findByPk(id);
+    const session = await this.models.sessions.findByPk(id);
     if (!session) return null;
     await session.update(values);
     return normalize(session);
   }
 
   async findRolesByUserId(userId) {
-    const userRoles = await this.models.UserRole.findAll({where: { userId, active: true }});
+    const userRoles = await this.models.userRoles.findAll({where: { userId, active: true }});
     const roleIds = userRoles.map((item) => item.roleId);
     if (roleIds.length === 0) return [];
-    const roles = await this.models.Role.findAll({where: { id: roleIds, active: true}});
+    const roles = await this.models.roles.findAll({where: { id: roleIds, active: true}});
     return roles.map(normalize);
   }
 
   async findPermissionsByUserId(userId, permission) {
-    const userRoles = await this.models.UserRole.findAll({
+    const userRoles = await this.models.userRoles.findAll({
       where: { userId, active: true },
       attributes: ["roleId"],
       include: [{
-        model: this.models.Role,
+        model: this.models.roles,
         as: "role",
         where: { active: true },
         attributes: ["id"],
@@ -575,18 +569,18 @@ class SequelizeAdapter {
     if (assignedRoleIds.length === 0) return [];
     const where = {active: true};
     if (permission) where.permission = permission;
-    const rolePermissions = await this.models.RolePermission.findAll({
+    const rolesPermissions = await this.models.rolesPermissions.findAll({
       where: {roleId: assignedRoleIds, active: true},
       attributes: ["permissionId"],
       include: [{
-        model: this.models.Permission,
+        model: this.models.permissions,
         as: "permission",
         where,
         required: true
       }]
     });
 
-    return uniqueNormalized$1(rolePermissions.map((item) => readValue(item, "permission")).filter(Boolean));
+    return uniqueNormalized$1(rolesPermissions.map((item) => readValue(item, "permission")).filter(Boolean));
   }
 
   opOr() {
@@ -629,11 +623,11 @@ class SeqAdapter {
   }
 
   async findUserByUsername(username) {
-    return (await this.models.User.findOne({where: {[Op.or]: [{ id: username }, { email: username }, { name: username }]}}))?.get() ?? null;
+    return (await this.models.users.findOne({where: {[Op.or]: [{ id: username }, { email: username }, { name: username }]}}))?.get() ?? null;
   }
 
   async findUserById(id) {
-    return (await this.models.User.findByPk(id))?.get() ?? null;
+    return (await this.models.users.findByPk(id))?.get() ?? null;
   }
 
   async verifyPassword(user, password) {
@@ -644,26 +638,26 @@ class SeqAdapter {
   async createSession(session) {
     const values = {id: session.id ?? createSessionId(), ...session};
 
-    const created = await this.models.Session.create(values);
+    const created = await this.models.sessions.create(values);
     const next = created.get();
     await writeAudit(this.auditable, { action: "create", rowId: next?.id, old: {}, new: next });
     return next;
   }
 
   async findSessionById(id) {
-    return (await this.models.Session.findByPk(id))?.get() ?? null;
+    return (await this.models.sessions.findByPk(id))?.get() ?? null;
   }
 
   async findSessionByToken(token) {
-    return (await this.models.Session.findOne({ where: { token } }))?.get() ?? null;
+    return (await this.models.sessions.findOne({ where: { token } }))?.get() ?? null;
   }
 
   async findActiveSessionByUserId(userId) {
-    return (await this.models.Session.findOne({where: { userId, active: true }}))?.get() ?? null;
+    return (await this.models.sessions.findOne({where: { userId, active: true }}))?.get() ?? null;
   }
 
   async deactivateSession(id) {
-    const session = await this.models.Session.findByPk(id);
+    const session = await this.models.sessions.findByPk(id);
     if (!session) return null;
     const previous = session.get();
     await session.update({ active: false, updatedAt: now() });
@@ -673,7 +667,7 @@ class SeqAdapter {
   }
 
   async updateSession(id, values) {
-    const session = await this.models.Session.findByPk(id);
+    const session = await this.models.sessions.findByPk(id);
     if (!session) return null;
     const previous = session.get();
     await session.update(values);
@@ -683,34 +677,34 @@ class SeqAdapter {
   }
 
   async findRolesByUserId(userId) {
-    const userRoles = await this.models.UserRole.findAll({where: { userId, active: true }});
+    const userRoles = await this.models.userRoles.findAll({where: { userId, active: true }});
     const roleIds = userRoles.map((item) => item.getDataValue("roleId"));
     if (roleIds.length === 0) return [];
-    const roles = await Promise.all(roleIds.map((id) => this.models.Role.findOne({ where: { id, active: true } })));
+    const roles = await Promise.all(roleIds.map((id) => this.models.roles.findOne({ where: { id, active: true } })));
     return roles.filter(Boolean).map((role) => role.get());
   }
 
   async findPermissionsByUserId(userId, permission) {
     const where = { active: true };
     if (permission) where.permission = permission;
-    const rolePermissions = await this.models.RolePermission.findAll({
+    const rolesPermissions = await this.models.rolesPermissions.findAll({
       where: {active: true},
       attributes: ["permissionId"],
       //eager: false,
       include: [
-        {model: this.models.Permission, as: "permission", where, required: true},
+        {model: this.models.permissions, as: "permission", where, required: true},
         {
-          model: this.models.Role,
+          model: this.models.roles,
           as: "role",
           where: { active: true },
           attributes: ["id"],
           required: true,
-          include: {model: this.models.UserRole, as: "userRoles", where: { userId, active: true }, attributes: ["id"], required: true}
+          include: {model: this.models.userRoles, as: "userRoles", where: { userId, active: true }, attributes: ["id"], required: true}
         }
       ]
     });
 
-    return uniqueNormalized(rolePermissions.map((item) => item.getDataValue("permission")).filter(Boolean));
+    return uniqueNormalized(rolesPermissions.map((item) => item.getDataValue("permission")).filter(Boolean));
   }
 }
 
@@ -727,7 +721,7 @@ async function writeAudit(auditable, change) {
   await auditable.write({
     module: "iam",
     resource: "session",
-    tableName: auditable.tableName || "Session",
+    tableName: auditable.tableName || "sessions",
     ...change
   });
 }

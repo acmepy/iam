@@ -39,7 +39,7 @@ try {
 }
 
 async function seed(models) {
-  await models.User.create({
+  await models.users.create({
     id: "admin",
     password: "1234",
     name: "Administrador",
@@ -48,24 +48,24 @@ async function seed(models) {
     active: true
   });
 
-  const role = await models.Role.create({
+  const role = await models.roles.create({
     role: "admin",
     active: true
   });
 
-  const permission = await models.Permission.create({
+  const permission = await models.permissions.create({
     permission: "users.list",
     title: "List users",
     active: true
   });
 
-  await models.UserRole.create({
+  await models.userRoles.create({
     userId: "admin",
     roleId: role.getDataValue("id"),
     active: true
   });
 
-  await models.RolePermission.create({
+  await models.rolesPermissions.create({
     roleId: role.getDataValue("id"),
     permissionId: permission.getDataValue("id"),
     active: true

@@ -6,25 +6,25 @@ test("SequelizeAdapter filters permissions with include", async () => {
   const calls = [];
   const adapter = new SequelizeAdapter({
     models: {
-      UserRole: {
+      userRoles: {
         async findAll(options) {
           calls.push(["UserRole", options]);
           return [{ roleId: 1 }, { roleId: 2 }];
         }
       },
-      Role: {
+      roles: {
         async findAll(options) {
           calls.push(["Role", options]);
           return [{ id: 1 }];
         }
       },
-      RolePermission: {
+      rolesPermissions: {
         async findAll(options) {
           calls.push(["RolePermission", options]);
           return [{ permissionId: 7, permission: { id: 7, permission: "users.list", active: true } }];
         }
       },
-      Permission: {
+      permissions: {
         async findAll(options) {
           calls.push(["Permission", options]);
           return [{ get: () => ({ id: 7, permission: "users.list", active: true }) }];
@@ -44,7 +44,7 @@ test("SequelizeAdapter filters permissions with include", async () => {
       where: { userId: "admin", active: true },
       attributes: ["roleId"],
       include: [{
-        model: adapter.models.Role,
+        model: adapter.models.roles,
         as: "role",
         where: { active: true },
         attributes: ["id"],
@@ -55,7 +55,7 @@ test("SequelizeAdapter filters permissions with include", async () => {
       where: { roleId: [1, 2], active: true },
       attributes: ["permissionId"],
       include: [{
-        model: adapter.models.Permission,
+        model: adapter.models.permissions,
         as: "permission",
         where: { active: true, permission: "users.list" },
         required: true

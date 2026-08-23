@@ -12,31 +12,30 @@ export function defineIamModels({ define, DataTypes, tableNames = {}, references
 }
 
 function associateIamModels(models) {
-  models.User.hasMany(models.UserRole, { foreignKey: "userId", as: "userRoles" });
-  models.User.hasMany(models.Session, { foreignKey: "userId", as: "sessions" });
-  models.User.belongsToMany(models.Role, { through: models.UserRole, foreignKey: "userId", otherKey: "roleId", as: "roles" });
+  models.users.hasMany(models.userRoles, { foreignKey: "userId", as: "userRoles" });
+  models.users.hasMany(models.sessions, { foreignKey: "userId", as: "sessions" });
+  models.users.belongsToMany(models.roles, { through: models.userRoles, foreignKey: "userId", otherKey: "roleId", as: "roles" });
 
-  models.Role.hasMany(models.UserRole, { foreignKey: "roleId", as: "userRoles" });
-  models.Role.hasMany(models.RolePermission, { foreignKey: "roleId", as: "rolePermissions" });
-  models.Role.belongsToMany(models.User, { through: models.UserRole, foreignKey: "roleId", otherKey: "userId", as: "users" });
-  models.Role.belongsToMany(models.Permission, { through: models.RolePermission, foreignKey: "roleId", otherKey: "permissionId", as: "permissions" });
+  models.roles.hasMany(models.userRoles, { foreignKey: "roleId", as: "userRoles" });
+  models.roles.hasMany(models.rolesPermissions, { foreignKey: "roleId", as: "rolesPermissions" });
+  models.roles.belongsToMany(models.users, { through: models.userRoles, foreignKey: "roleId", otherKey: "userId", as: "users" });
+  models.roles.belongsToMany(models.permissions, { through: models.rolesPermissions, foreignKey: "roleId", otherKey: "permissionId", as: "permissions" });
 
-  models.Permission.hasMany(models.RolePermission, { foreignKey: "permissionId", as: "rolePermissions" });
-  models.Permission.belongsToMany(models.Role, { through: models.RolePermission, foreignKey: "permissionId", otherKey: "roleId", as: "roles" });
+  models.permissions.hasMany(models.rolesPermissions, { foreignKey: "permissionId", as: "rolesPermissions" });
+  models.permissions.belongsToMany(models.roles, { through: models.rolesPermissions, foreignKey: "permissionId", otherKey: "roleId", as: "roles" });
 
-  models.UserRole.belongsTo(models.User, { foreignKey: "userId", as: "user" });
-  models.UserRole.belongsTo(models.Role, { foreignKey: "roleId", as: "role" });
+  models.userRoles.belongsTo(models.users, { foreignKey: "userId", as: "user" });
+  models.userRoles.belongsTo(models.roles, { foreignKey: "roleId", as: "role" });
 
-  models.RolePermission.belongsTo(models.Role, { foreignKey: "roleId", as: "role" });
-  models.RolePermission.belongsTo(models.Permission, { foreignKey: "permissionId", as: "permission" });
+  models.rolesPermissions.belongsTo(models.roles, { foreignKey: "roleId", as: "role" });
+  models.rolesPermissions.belongsTo(models.permissions, { foreignKey: "permissionId", as: "permission" });
 
-  models.Session.belongsTo(models.User, { foreignKey: "userId", as: "user" });
+  models.sessions.belongsTo(models.users, { foreignKey: "userId", as: "user" });
 }
 
 const modelDefinitions = [
   {
-    name: "User",
-    //tableName: "users",
+    name: "users",
     attributes: {
       id: { type: "string", length: 100, primaryKey: true, allowNull: false },
       password: { type: "string", length: 255, allowNull: false },
@@ -47,8 +46,7 @@ const modelDefinitions = [
     }
   },
   {
-    name: "Role",
-    //tableName: "roles",
+    name: "roles",
     attributes: {
       id: { type: "integer", primaryKey: true, autoIncrement: true },
       role: { type: "string", length: 100, allowNull: false },
@@ -56,8 +54,7 @@ const modelDefinitions = [
     }
   },
   {
-    name: "Permission",
-    //tableName: "permissions",
+    name: "permissions",
     attributes: {
       id: { type: "integer", primaryKey: true, autoIncrement: true },
       permission: { type: "string", length: 150, allowNull: false },
@@ -66,31 +63,28 @@ const modelDefinitions = [
     }
   },
   {
-    name: "UserRole",
-    //tableName: "user_roles",
+    name: "userRoles",
     attributes: {
       id: { type: "integer", primaryKey: true, autoIncrement: true },
-      userId: { type: "string", length: 100, allowNull: false, references: { model: "User", key: "id" } },
-      roleId: { type: "integer", allowNull: false, references: { model: "Role", key: "id" } },
+      userId: { type: "string", length: 100, allowNull: false, references: { model: "users", key: "id" } },
+      roleId: { type: "integer", allowNull: false, references: { model: "roles", key: "id" } },
       active: { type: "boolean", allowNull: false, defaultValue: true }
     }
   },
   {
-    name: "RolePermission",
-    //tableName: "role_permissions",
+    name: "rolesPermissions",
     attributes: {
       id: { type: "integer", primaryKey: true, autoIncrement: true },
-      roleId: { type: "integer", allowNull: false, references: { model: "Role", key: "id" } },
-      permissionId: { type: "integer", allowNull: false, references: { model: "Permission", key: "id" } },
+      roleId: { type: "integer", allowNull: false, references: { model: "roles", key: "id" } },
+      permissionId: { type: "integer", allowNull: false, references: { model: "permissions", key: "id" } },
       active: { type: "boolean", allowNull: false, defaultValue: true }
     }
   },
   {
-    name: "Session",
-    //tableName: "sessions",
+    name: "sessions",
     attributes: {
       id: { type: "string", length: 100, primaryKey: true, allowNull: false },
-      userId: { type: "string", length: 100, allowNull: false, references: { model: "User", key: "id" } },
+      userId: { type: "string", length: 100, allowNull: false, references: { model: "users", key: "id" } },
       token: { type: "string", length: 500, allowNull: true },
       options: { type: "json", allowNull: true, defaultValue: () => ({}) },
       active: { type: "boolean", allowNull: false, defaultValue: true }

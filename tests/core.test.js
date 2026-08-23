@@ -23,7 +23,7 @@ function createAdapter() {
     userRoles: [
       { id: 1, userId: "admin", roleId: 1, active: true }
     ],
-    rolePermissions: [
+    rolesPermissions: [
       { id: 1, roleId: 1, permissionId: 1, active: true }
     ]
   });

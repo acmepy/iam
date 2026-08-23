@@ -29,7 +29,7 @@ const adapter = new MemoryAdapter({
   roles: [{ id: 1, role: "admin", active: true }],
   permissions: [{ id: 1, permission: "users.list", active: true }],
   userRoles: [{ id: 1, userId: "admin", roleId: 1, active: true }],
-  rolePermissions: [{ id: 1, roleId: 1, permissionId: 1, active: true }]
+  rolesPermissions: [{ id: 1, roleId: 1, permissionId: 1, active: true }]
 });
 
 const rbac = new RBAC({ adapter });
@@ -242,7 +242,7 @@ const adapter = new SeqAdapter({ seq });
 await seq.init();
 await seq.sync();
 
-await adapter.models.User.create({
+await adapter.models.users.create({
   id: "admin",
   password: "1234",
   name: "Administrador",
@@ -277,12 +277,12 @@ const adapter = new SeqAdapter({
 ```js
 const adapter = new SeqAdapter({
   models: {
-    User,
-    Role,
-    Permission,
-    UserRole,
-    RolePermission,
-    Session
+    users,
+    roles,
+    permissions,
+    userRoles,
+    rolesPermissions,
+    sessions
   }
 });
 ```
@@ -293,17 +293,17 @@ Si solo necesitas cambiar los nombres fisicos de las tablas, podes pasar `tableN
 const adapter = new SeqAdapter({
   seq,
   tableNames: {
-    User: "iam_users",
-    Role: "iam_roles",
-    Permission: "iam_permissions",
-    UserRole: "iam_user_roles",
-    RolePermission: "iam_role_permissions",
-    Session: "iam_sessions"
+    users: "iam_users",
+    roles: "iam_roles",
+    permissions: "iam_permissions",
+    userRoles: "iam_user_roles",
+    rolesPermissions: "iam_role_permissions",
+    sessions: "iam_sessions"
   }
 });
 ```
 
-Las claves de `models` y `tableNames` corresponden a los modelos internos de IAM: `User`, `Role`, `Permission`, `UserRole`, `RolePermission` y `Session`.
+Las claves de `models` y `tableNames` corresponden a los modelos internos de IAM: `users`, `roles`, `permissions`, `userRoles`, `rolesPermissions` y `sessions`.
 
 ## Exportaciones
 

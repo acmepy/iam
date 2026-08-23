@@ -22,7 +22,7 @@ const adapter = new MemoryAdapter({
   roles: [{ id: 1, role: "admin", active: true }],
   permissions: [{ id: 1, permission: "users.list", title: "List users", active: true }],
   userRoles: [{ id: 1, userId: "admin", roleId: 1, active: true }],
-  rolePermissions: [{ id: 1, roleId: 1, permissionId: 1, active: true }]
+  rolesPermissions: [{ id: 1, roleId: 1, permissionId: 1, active: true }]
 });
 
 app.use(auth({adapter, jwt: {secret, expiresIn: "1h"}}));

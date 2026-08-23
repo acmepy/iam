@@ -10,11 +10,11 @@ export class SequelizeAdapter {
   }
 
   async findUserByUsername(username) {
-    return normalize(await this.models.User.findOne({where: {[this.opOr()]: [{ id: username }, { email: username }, { name: username }]}}));
+    return normalize(await this.models.users.findOne({where: {[this.opOr()]: [{ id: username }, { email: username }, { name: username }]}}));
   }
 
   async findUserById(id) {
-    return normalize(await this.models.User.findByPk(id));
+    return normalize(await this.models.users.findByPk(id));
   }
 
   async verifyPassword(user, password) {
@@ -25,49 +25,49 @@ export class SequelizeAdapter {
   async createSession(session) {
     const values = { id: session.id ?? createSessionId(), ...session};
 
-    return normalize(await this.models.Session.create(values));
+    return normalize(await this.models.sessions.create(values));
   }
 
   async findSessionById(id) {
-    return normalize(await this.models.Session.findByPk(id));
+    return normalize(await this.models.sessions.findByPk(id));
   }
 
   async findSessionByToken(token) {
-    return normalize(await this.models.Session.findOne({ where: { token } }));
+    return normalize(await this.models.sessions.findOne({ where: { token } }));
   }
 
   async findActiveSessionByUserId(userId) {
-    return normalize(await this.models.Session.findOne({where: { userId, active: true }}));
+    return normalize(await this.models.sessions.findOne({where: { userId, active: true }}));
   }
 
   async deactivateSession(id) {
-    const session = await this.models.Session.findByPk(id);
+    const session = await this.models.sessions.findByPk(id);
     if (!session) return null;
     await session.update({ active: false, updatedAt: now() });
     return normalize(session);
   }
 
   async updateSession(id, values) {
-    const session = await this.models.Session.findByPk(id);
+    const session = await this.models.sessions.findByPk(id);
     if (!session) return null;
     await session.update(values);
     return normalize(session);
   }
 
   async findRolesByUserId(userId) {
-    const userRoles = await this.models.UserRole.findAll({where: { userId, active: true }});
+    const userRoles = await this.models.userRoles.findAll({where: { userId, active: true }});
     const roleIds = userRoles.map((item) => item.roleId);
     if (roleIds.length === 0) return [];
-    const roles = await this.models.Role.findAll({where: { id: roleIds, active: true}});
+    const roles = await this.models.roles.findAll({where: { id: roleIds, active: true}});
     return roles.map(normalize);
   }
 
   async findPermissionsByUserId(userId, permission) {
-    const userRoles = await this.models.UserRole.findAll({
+    const userRoles = await this.models.userRoles.findAll({
       where: { userId, active: true },
       attributes: ["roleId"],
       include: [{
-        model: this.models.Role,
+        model: this.models.roles,
         as: "role",
         where: { active: true },
         attributes: ["id"],
@@ -78,18 +78,18 @@ export class SequelizeAdapter {
     if (assignedRoleIds.length === 0) return [];
     const where = {active: true};
     if (permission) where.permission = permission;
-    const rolePermissions = await this.models.RolePermission.findAll({
+    const rolesPermissions = await this.models.rolesPermissions.findAll({
       where: {roleId: assignedRoleIds, active: true},
       attributes: ["permissionId"],
       include: [{
-        model: this.models.Permission,
+        model: this.models.permissions,
         as: "permission",
         where,
         required: true
       }]
     });
 
-    return uniqueNormalized(rolePermissions.map((item) => readValue(item, "permission")).filter(Boolean));
+    return uniqueNormalized(rolesPermissions.map((item) => readValue(item, "permission")).filter(Boolean));
   }
 
   opOr() {

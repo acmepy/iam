@@ -127,7 +127,7 @@ export interface AdapterData {
   roles?: RoleData[];
   permissions?: PermissionData[];
   userRoles?: UserRoleData[];
-  rolePermissions?: RolePermissionData[];
+  rolesPermissions?: RolePermissionData[];
   sessions?: SessionData[];
 }
 

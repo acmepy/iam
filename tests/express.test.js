@@ -217,6 +217,7 @@ test("post login returns public session with jwt token and expiresIn", async () 
   assert.deepEqual(res.body.data.permissions, ["users.list"]);
   assert.deepEqual(res.body.data.options, { empresa: 2 });
   assert.equal(typeof res.body.data.token, "string");
+  assert.equal((await adapter.findSessionById(res.body.data.id)).token, res.body.data.token);
   assert.equal(res.body.data.expiresIn, 3600);
 });
 

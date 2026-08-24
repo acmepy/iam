@@ -58,6 +58,7 @@ async function handleLogin(req, res, next, { authCore, jwt, options }) {
     const publicValue = await createPublicSession(authCore, session, user);
     const expiresIn = normalizeExpiresIn(jwt.expiresIn);
     const token = await signJwt({ sessionId: session.id }, jwt.secret, { expiresIn });
+    if (session.id) await authCore.adapter.updateSession(session.id, { token });
 
     return sendData(res, { ...publicValue, token, expiresIn });
   } catch (error) {

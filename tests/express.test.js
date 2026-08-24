@@ -86,14 +86,16 @@ test("basic auth allows a permitted request", async () => {
 
 test("auth accepts a Seq-compatible logger instance", async () => {
   const events = [];
-  const logger = {
+  class Logger {
     trace(...args) {
       events.push({ level: "trace", context: this, args });
-    },
-    info() {},
-    warn() {},
+    }
+
+    info() {}
+    warn() {}
     error() {}
-  };
+  }
+  const logger = new Logger();
   const req = createRequest({
     method: "GET",
     path: "/users",

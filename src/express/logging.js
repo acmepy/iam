@@ -10,12 +10,12 @@ export function normalizeLogging(logging) {
   };
 
   if (logging === undefined || logging === true) return { ...defaults };
-  if (logging === false || logging === null || typeof logging !== "object") return disabled;
+  if (logging === false || logging === null || (typeof logging !== "object" && typeof logging !== "function")) return disabled;
   return {
-    ...defaults,
-    ...logging,
-    warn: logging.warn ?? defaults.warn,
+    info: logging.info ?? defaults.info,
     trace: logging.trace ?? defaults.trace,
+    warn: logging.warn ?? defaults.warn,
+    error: logging.error ?? defaults.error,
     target: logging
   };
 }

@@ -12,6 +12,7 @@ import {
 } from "../core/errors.js";
 import { createSessionId, now, publicSession } from "../core/utils.js";
 import { setContext } from "./context.js";
+import { log, normalizeLogging } from "./logging.js";
 
 const basicRealm = "IAM";
 
@@ -27,7 +28,7 @@ export function auth(options = {}) {
 
   const jwt = resolveJwtConfig(options);
   const rbac = new RBAC({ adapter });
-  const authCore = { adapter, rbac };
+  const authCore = { adapter, rbac, logging: normalizeLogging(options.logging) };
 
   return async function iamAuth(req, res, next) {
     try {
@@ -35,13 +36,16 @@ export function auth(options = {}) {
       if (matches(req, "GET", "/session")) {
         const session = await authenticateRequest(req, { authCore, jwt, options });
         attach(req, { authCore, rbac, session });
+        log(authCore.logging, "trace", "Sesión consultada", { sessionId: session.id, userId: session.user.id });
         return sendData(res, session);
       }
       if (matches(req, "POST", "/logout")) return handleLogout(req, res, { authCore, jwt, options, rbac });
       const session = await authenticateRequest(req, { authCore, jwt, options });
       attach(req, { authCore, rbac, session });
+      log(authCore.logging, "trace", "Acceso autenticado", { method: req.method, path: req.path, userId: session.user.id });
       return next();
     } catch (error) {
+      log(authCore.logging, "error", "Error de autenticación", { method: req.method, path: req.path, error: error.message, status: error.status ?? 500 });
       if (!(Number(error?.status ?? 500) < 500)) return next(error);
       return sendError(res, error, shouldChallenge(error, req));
     }
@@ -59,9 +63,11 @@ async function handleLogin(req, res, next, { authCore, jwt, options }) {
     const expiresIn = normalizeExpiresIn(jwt.expiresIn);
     const token = await signJwt({ sessionId: session.id }, jwt.secret, { expiresIn });
     if (session.id) await authCore.adapter.updateSession(session.id, { token });
+    log(authCore.logging, "info", "Sesión iniciada", { sessionId: session.id, userId: user.id });
 
     return sendData(res, { ...publicValue, token, expiresIn });
   } catch (error) {
+    log(authCore.logging, "error", "Error de inicio de sesión", { method: req.method, path: req.path, error: error.message, status: error.status ?? 500 });
     if (!shouldSendError(error)) return next(error);
     return sendLoginError(res, error, req);
   }
@@ -72,12 +78,14 @@ async function handleLogout(req, res, { authCore, jwt, options, rbac }) {
 
   if (sessionId) {
     await authCore.adapter.deactivateSession(sessionId);
+    log(authCore.logging, "info", "Sesión cerrada", { sessionId });
     return sendData(res, {});
   }
 
   const session = await authenticateRequest(req, { authCore, jwt, options });
   attach(req, { authCore, rbac, session });
   await authCore.adapter.deactivateSession(session.id);
+  log(authCore.logging, "info", "Sesión cerrada", { sessionId: session.id, userId: session.user.id });
   return sendData(res, {});
 }
 

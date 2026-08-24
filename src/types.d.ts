@@ -16,6 +16,13 @@ export type ExpressMiddleware = (
 
 export type AuthStrategy = "jwt" | "basic";
 
+export type Logging = boolean | {
+  info?: ((...args: unknown[]) => void) | false;
+  trace?: ((...args: unknown[]) => void) | false;
+  warn?: ((...args: unknown[]) => void) | false;
+  error?: ((...args: unknown[]) => void) | false;
+};
+
 export interface ExpressAuthOptions {
   adapter: Adapter;
   jwt?: {
@@ -25,6 +32,7 @@ export interface ExpressAuthOptions {
   strategy?: AuthStrategy;
   strategies?: AuthStrategy[];
   createSession?: boolean;
+  logging?: Logging;
 }
 
 export interface BrowserAuthOptions {

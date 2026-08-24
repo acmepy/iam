@@ -1,6 +1,6 @@
 {
   "name": "iam",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "Small IAM authentication, authorization, and session library for JavaScript.",
   "type": "module",
   "main": "./dist/express.js",
@@ -32,7 +32,7 @@
     }
   },
   "scripts": {
-    "build": "rollup -c",
+    "build": "npm run test && rollup -c",
     "prepack": "npm run build",
     "example:sqlite": "node examples/sqlite.js",
     "example:express": "node examples/express.js",

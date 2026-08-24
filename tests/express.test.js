@@ -84,6 +84,30 @@ test("basic auth allows a permitted request", async () => {
   assert.deepEqual(req.session.permissions, ["users.list"]);
 });
 
+test("auth accepts a Seq-compatible logger instance", async () => {
+  const events = [];
+  const logger = {
+    trace(...args) {
+      events.push({ level: "trace", context: this, args });
+    },
+    info() {},
+    warn() {},
+    error() {}
+  };
+  const req = createRequest({
+    method: "GET",
+    path: "/users",
+    headers: { authorization: basic("admin", "1234") }
+  });
+  const res = createResponse();
+
+  await auth({ adapter: createAdapter(), jwt: { secret }, logging: logger })(req, res, async () => {
+    await can("users.list")(req, res, () => {});
+  });
+
+  assert.ok(events.some((event) => event.context === logger && event.args[0] === "[IAM]" && event.args[1] === "Permiso concedido"));
+});
+
 test("application list responses use data as the collection", async () => {
   const req = createRequest({
     method: "GET",

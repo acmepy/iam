@@ -256,6 +256,42 @@ const rbac = new RBAC({ adapter });
 console.log(await rbac.can("admin", "users.list")); // true
 ```
 
+### Logging de autenticación y permisos
+
+`auth` usa la misma convención de `logging` que `Seq`: por defecto registra eventos; usa `false` para desactivarlos o un objeto con handlers por nivel. Los eventos no incluyen contraseñas, tokens ni secretos.
+
+```js
+app.use(auth({
+  adapter,
+  jwt: { secret: process.env.JWT_SECRET },
+  logging: {
+    info: console.log,
+    trace: console.debug,
+    error: console.error
+  }
+}));
+```
+
+Se emite `trace` para accesos autenticados y permisos concedidos, `info` para inicios/cierres de sesión y permisos denegados, y `error` para errores internos.
+
+Al igual que en `Seq`, se puede pasar directamente una instancia de `com.acmepy.logger-js`:
+
+```js
+import { createLogger, logger, LEVELS } from "com.acmepy.logger-js";
+
+createLogger({
+  name: "[iam]",
+  displayConsole: true,
+  level: LEVELS.INFO
+});
+
+app.use(auth({
+  adapter,
+  jwt: { secret: process.env.JWT_SECRET },
+  logging: logger
+}));
+```
+
 `SeqAdapter` tambien puede emitir cambios auditables de sesion sin acoplarse a ningun sistema de auditoria especifico:
 
 ```js

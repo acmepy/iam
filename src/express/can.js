@@ -4,6 +4,7 @@ import {
   SessionRequiredError
 } from "../core/errors.js";
 import { getContext } from "./context.js";
+import { log } from "./logging.js";
 
 /**
  * Express authorization middleware for a single permission.
@@ -21,10 +22,19 @@ export function can(permission) {
       if (!context || !userId) throw new SessionRequiredError();
 
       const allowed = await context.rbac.can(userId, permission);
-      if (!allowed) throw new ForbiddenError();
+      if (!allowed) {
+        log(context.auth.logging, "info", "Permiso denegado", { userId, permission });
+        throw new ForbiddenError();
+      }
+
+      log(context.auth.logging, "trace", "Permiso concedido", { userId, permission });
 
       return next();
     } catch (error) {
+      const context = getContext(req);
+      if (Number(error?.status ?? 500) >= 500) {
+        log(context?.auth?.logging, "error", "Error de autorización", { userId: req.session?.user?.id, permission, error: error.message, status: error.status ?? 500 });
+      }
       if (!(Number(error?.status ?? 500) < 500)) return next(error);
       return sendError(res, error);
     }

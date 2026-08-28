@@ -250,7 +250,7 @@ async function handleLogin(req, res, next, { authCore, jwt, options }) {
     if (!credentials) throw new AuthRequiredError();
 
     const user = await validateCredentials(authCore.adapter, credentials.username, credentials.password);
-    const session = await createSession(authCore.adapter, user.id, credentials.options ?? {}, options);
+    const session = await createSession(authCore.adapter, user.id, sessionOptions(user, credentials.options), options);
     const publicValue = await createPublicSession(authCore, session, user);
     const expiresIn = normalizeExpiresIn(jwt.expiresIn);
     const token = await signJwt({ sessionId: session.id }, jwt.secret, { expiresIn });
@@ -307,7 +307,7 @@ async function authenticateJwt(header, authCore, jwt) {
 async function authenticateBasic(header, authCore, options) {
   const credentials = credentialsFromBasicValue(header.slice("Basic ".length).trim());
   const user = await validateCredentials(authCore.adapter, credentials.username, credentials.password);
-  const session = await createOrReuseSession(authCore.adapter, user.id, {}, options);
+  const session = await createOrReuseSession(authCore.adapter, user.id, sessionOptions(user), options);
   return createPublicSession(authCore, session, user);
 }
 
@@ -348,6 +348,10 @@ function credentialsFromBasicValue(value) {
     username: decoded.slice(0, separator),
     password: decoded.slice(separator + 1)
   };
+}
+
+function sessionOptions(user, options = {}) {
+  return { ...(user?.options || {}), ...(options || {}) };
 }
 
 async function validateCredentials(adapter, username, password) {

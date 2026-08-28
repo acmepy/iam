@@ -15,7 +15,7 @@ function createAdapter() {
         password: "1234",
         name: "Administrador",
         email: "admin@app.com",
-        options: {},
+        options: { empresa: 1, locale: "es-PY" },
         active: true
       }
     ],
@@ -240,9 +240,11 @@ test("post login returns public session with jwt token and expiresIn", async () 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.ok, true);
   assert.equal(res.body.data.user.id, "admin");
+  assert.deepEqual(res.body.data.user.options, { empresa: 1, locale: "es-PY" });
   assert.deepEqual(res.body.data.permissions, ["users.list"]);
-  assert.deepEqual(res.body.data.options, { empresa: 2 });
+  assert.deepEqual(res.body.data.options, { empresa: 2, locale: "es-PY" });
   assert.equal(typeof res.body.data.token, "string");
+  assert.deepEqual((await adapter.findSessionById(res.body.data.id)).options, { empresa: 2, locale: "es-PY" });
   assert.equal((await adapter.findSessionById(res.body.data.id)).token, res.body.data.token);
   assert.equal(res.body.data.expiresIn, 3600);
 });

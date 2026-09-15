@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { SignJWT } from "jose";
 import { MemoryAdapter } from "../src/adapters/index.js";
-import { auth, can } from "../src/express/index.js";
+import { auth, can, verifyJwt } from "../src/express/index.js";
 import { getContext } from "../src/express/context.js";
 
 const secret = "secret";
@@ -268,6 +268,19 @@ test("get session accepts bearer jwt tokens", async () => {
   assert.equal(res.body.data.id, login.body.data.id);
   assert.equal(res.body.data.user.id, "admin");
   assert.deepEqual(res.body.data.permissions, ["users.list"]);
+});
+
+test("verifyJwt returns the verified payload including exp", async () => {
+  const exp = Math.floor(Date.now() / 1000) + 3600;
+  const token = await new SignJWT({ sessionId: "session-1" })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setExpirationTime(exp)
+    .sign(new TextEncoder().encode(secret));
+
+  const payload = await verifyJwt(token, secret);
+
+  assert.equal(payload.sessionId, "session-1");
+  assert.equal(payload.exp, exp);
 });
 
 test("expired jwt tokens are rejected", async () => {

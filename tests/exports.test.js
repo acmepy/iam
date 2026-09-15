@@ -9,4 +9,5 @@ test("package exports expose root, adapters and express subpaths", async () => {
   assert.equal(typeof root.RBAC, "function");
   assert.equal(typeof adapters.SeqAdapter, "function");
   assert.equal(typeof express.auth, "function");
+  assert.equal(typeof express.verifyJwt, "function");
 });

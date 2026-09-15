@@ -49,7 +49,7 @@ await rbac.can("admin", "users.list");
 
 ## Middleware para Express
 
-`iam/express` expone solo dos middlewares publicos: `auth` y `can`.
+`iam/express` expone los middlewares publicos `auth` y `can`, y `verifyJwt` para verificar un token JWT HS256 fuera del middleware. `verifyJwt` devuelve el payload verificado, incluido `exp` cuando el token lo tiene.
 `auth(options)` se instala una vez con `app.use(...)`, autentica requests con Basic o Bearer JWT, maneja las rutas estandar de sesion y deja `req.session` disponible para las rutas protegidas.
 
 ```js

@@ -232,7 +232,14 @@ async function signJwt(payload, secret, options = {}) {
   return jwt.sign(createSecretKey(secret));
 }
 
-async function verifyJwt(token, secret) {
+/**
+ * Verifies an HS256 JWT and returns its verified payload.
+ *
+ * @param {string} token
+ * @param {string} secret
+ * @returns {Promise<import("jose").JWTPayload>}
+ */
+export async function verifyJwt(token, secret) {
   try {
     const { payload } = await jwtVerify(token, createSecretKey(secret), {algorithms: ["HS256"]});
     return payload;

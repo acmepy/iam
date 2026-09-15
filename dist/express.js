@@ -1,4 +1,4 @@
-import { SignJWT, jwtVerify } from 'jose';
+import { jwtVerify, SignJWT } from 'jose';
 
 class RbacError extends Error {
   constructor(message, status = 400, code = "RBAC_ERROR", errors = {}, stack) {
@@ -424,6 +424,13 @@ async function signJwt(payload, secret, options = {}) {
   return jwt.sign(createSecretKey(secret));
 }
 
+/**
+ * Verifies an HS256 JWT and returns its verified payload.
+ *
+ * @param {string} token
+ * @param {string} secret
+ * @returns {Promise<import("jose").JWTPayload>}
+ */
 async function verifyJwt(token, secret) {
   try {
     const { payload } = await jwtVerify(token, createSecretKey(secret), {algorithms: ["HS256"]});
@@ -558,4 +565,4 @@ function sendError(res, error) {
   });
 }
 
-export { auth, can };
+export { auth, can, verifyJwt };

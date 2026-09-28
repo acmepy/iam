@@ -8,3 +8,9 @@
 
 Solo actualizar el README para documentar funcionalidades ya implementadas y verificadas.
 No agregar ejemplos, opciones ni comportamiento futuro o no probado.
+
+## Registro de tareas
+
+- Registrar las tareas del proyecto en `taks.md` y mantener sus estados actualizados.
+- Usar `[]` para tareas pendientes y `[X]` para tareas completadas.
+- Marcar una tarea como completada solo después de implementarla y verificarla.

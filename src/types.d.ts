@@ -25,6 +25,7 @@ export type Logging = boolean | {
 
 export interface ExpressAuthOptions {
   adapter: Adapter;
+  registration?: boolean;
   jwt?: {
     secret: string;
     expiresIn?: number | string;
@@ -117,6 +118,11 @@ export interface PublicSession {
 }
 
 export interface Adapter {
+  createUser?(user: UserData): Promise<UserData>;
+  updateUser?(id: Id, values: Partial<Pick<UserData, "name" | "email">>): Promise<UserData | null>;
+  createPasswordReset?(reset: PasswordResetData): Promise<void>;
+  changePassword?(userId: Id, expectedPassword: string | undefined, password: string): Promise<boolean>;
+  resetPassword?(id: string, password: string, timestamp: number): Promise<boolean>;
   findUserByUsername(username: string): Promise<UserData | null>;
   findUserById(id: Id): Promise<UserData | null>;
   verifyPassword?(user: UserData, password: string): Promise<boolean> | boolean;
@@ -131,6 +137,7 @@ export interface Adapter {
 }
 
 export interface AdapterData {
+  passwordResets?: PasswordResetData[];
   users?: UserData[];
   roles?: RoleData[];
   permissions?: PermissionData[];
@@ -147,6 +154,12 @@ export interface AuditChange {
   rowId?: Id | null;
   old?: Dict;
   new?: Dict;
+}
+
+export interface PasswordResetData {
+  id: string;
+  userId: Id;
+  expiresAt: number;
 }
 
 export type Auditable =

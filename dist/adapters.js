@@ -30,7 +30,7 @@ function createSessionId() {
   return `${time}${random}`.slice(0, 26);
 }
 
-const collections$1 = ["users", "roles", "permissions", "usersRoles", "rolesPermissions", "sessions"];
+const collections$1 = ["users", "roles", "permissions", "usersRoles", "rolesPermissions", "sessions", "passwordResets"];
 
 /**
  * In-memory IAM adapter, useful for tests, demos, and small embedded setups.
@@ -53,6 +53,47 @@ class MemoryAdapter {
 
   async verifyPassword(user, password) {
     return user.password === password;
+  }
+
+  async createUser(user) {
+    if (this.users.some(item => item.id === user.id)) throw new Error("User id duplicado");
+    this.users.push({ ...user });
+    return { ...user };
+  }
+
+  async updateUser(id, values) {
+    const user = this.users.find(item => item.id === id);
+    if (!user) return null;
+    Object.assign(user, values, { updatedAt: now() });
+    return { ...user };
+  }
+
+  async createPasswordReset(reset) {
+    this.passwordResets.push({ ...reset });
+  }
+
+  async changePassword(userId, expectedPassword, password) {
+    const user = this.users.find(item => item.id === userId);
+    if (!user || user.password !== expectedPassword) return false;
+    this.replacePassword(user, password);
+    return true;
+  }
+
+  async resetPassword(id, password, timestamp) {
+    const reset = this.passwordResets.find(item => item.id === id && item.expiresAt > timestamp);
+    const user = reset && this.users.find(item => item.id === reset.userId);
+    if (!user) return false;
+    this.replacePassword(user, password);
+    return true;
+  }
+
+  replacePassword(user, password) {
+    user.password = password;
+    user.updatedAt = now();
+    this.passwordResets = this.passwordResets.filter(item => item.userId !== user.id);
+    for (const session of this.sessions) {
+      if (session.userId === user.id) Object.assign(session, { active: false, updatedAt: now() });
+    }
   }
 
   async createSession(session) {
@@ -110,6 +151,36 @@ class LocalStorageAdapter extends MemoryAdapter {
     this.key = key;
   }
 
+  async createUser(user) {
+    const result = await super.createUser(user);
+    await this.save();
+    return result;
+  }
+
+  async updateUser(id, values) {
+    const result = await super.updateUser(id, values);
+    await this.save();
+    return result;
+  }
+
+  async createPasswordReset(reset) {
+    const result = await super.createPasswordReset(reset);
+    await this.save();
+    return result;
+  }
+
+  async changePassword(userId, expectedPassword, password) {
+    const result = await super.changePassword(userId, expectedPassword, password);
+    await this.save();
+    return result;
+  }
+
+  async resetPassword(id, password, timestamp) {
+    const result = await super.resetPassword(id, password, timestamp);
+    await this.save();
+    return result;
+  }
+
   async createSession(session) {
     const result = await super.createSession(session);
     this.save();
@@ -130,7 +201,7 @@ class LocalStorageAdapter extends MemoryAdapter {
 
   save() {
     if (!this.storage) throw new AdapterError("localStorage no está disponible");
-    this.storage.setItem(this.key, JSON.stringify({users: this.users, roles: this.roles, permissions: this.permissions, usersRoles: this.usersRoles, rolesPermissions: this.rolesPermissions, sessions: this.sessions}));
+    this.storage.setItem(this.key, JSON.stringify({users: this.users, roles: this.roles, permissions: this.permissions, usersRoles: this.usersRoles, rolesPermissions: this.rolesPermissions, sessions: this.sessions, passwordResets: this.passwordResets}));
   }
 }
 
@@ -140,7 +211,7 @@ function load(storage, key) {
   return value ? JSON.parse(value) : null;
 }
 
-const collections = ["users", "roles", "permissions", "usersRoles", "rolesPermissions", "sessions"];
+const collections = ["users", "roles", "permissions", "usersRoles", "rolesPermissions", "sessions", "passwordResets"];
 const defaultDbName = "iam";
 const defaultStoreName = "collections";
 
@@ -181,6 +252,36 @@ class IndexedDBAdapter extends MemoryAdapter {
     for (const name of collections) store.put({ name, items: this[name] }, name);
     await done;
     return this;
+  }
+
+  async createUser(user) {
+    const result = await super.createUser(user);
+    await this.save();
+    return result;
+  }
+
+  async updateUser(id, values) {
+    const result = await super.updateUser(id, values);
+    await this.save();
+    return result;
+  }
+
+  async createPasswordReset(reset) {
+    const result = await super.createPasswordReset(reset);
+    await this.save();
+    return result;
+  }
+
+  async changePassword(userId, expectedPassword, password) {
+    const result = await super.changePassword(userId, expectedPassword, password);
+    await this.save();
+    return result;
+  }
+
+  async resetPassword(id, password, timestamp) {
+    const result = await super.resetPassword(id, password, timestamp);
+    await this.save();
+    return result;
   }
 
   async createSession(session) {
@@ -277,6 +378,14 @@ const modelDefinitions = [
     }
   },
   {
+    name: "passwordResets",
+    attributes: {
+      id: { type: "string", length: 64, primaryKey: true, allowNull: false },
+      userId: { type: "string", length: 100, allowNull: false, references: { model: "users", key: "id" } },
+      expiresAt: { type: "integer", allowNull: false }
+    }
+  },
+  {
     name: "roles",
     attributes: {
       id: { type: "integer", primaryKey: true, autoIncrement: true },
@@ -359,6 +468,55 @@ class SequelizeAdapter {
   async verifyPassword(user, password) {
     if (typeof user.verifyPassword === "function") return user.verifyPassword(password);
     return user.password === password;
+  }
+
+
+  async createUser(user) {
+    return (await this.models.users.create(user)).get({ plain: true });
+  }
+
+  async updateUser(id, values) {
+    const user = await this.models.users.findByPk(id);
+    if (!user) return null;
+    await user.update(values);
+    return user.get({ plain: true });
+  }
+
+  async createPasswordReset(reset) {
+    if (!this.models.passwordResets) throw new AdapterError("Modelo passwordResets requerido");
+    await this.models.passwordResets.create(reset);
+  }
+
+  async changePassword(userId, expectedPassword, password) {
+    const engine = this.sequelize ?? this.models.users.sequelize;
+    if (!engine?.transaction) throw new AdapterError("Transacciones requeridas para cambiar contrasena");
+    return engine.transaction(async transaction => {
+      const user = await this.models.users.findByPk(userId, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!user || user.get({ plain: true }).password !== expectedPassword) return false;
+      await user.update({ password }, { transaction });
+      await this.models.sessions.update({ active: false }, { where: { userId }, transaction });
+      if (this.models.passwordResets) await this.models.passwordResets.destroy({ where: { userId }, transaction });
+      return true;
+    });
+  }
+
+  async resetPassword(id, password, timestamp) {
+    const engine = this.sequelize ?? this.models.users.sequelize;
+    if (!engine?.transaction || !this.models.passwordResets) throw new AdapterError("Transacciones y modelo passwordResets requeridos");
+    return engine.transaction(async transaction => {
+      const reset = await this.models.passwordResets.findByPk(id, { transaction });
+      if (!reset) return false;
+      const values = reset.get({ plain: true });
+      if (values.expiresAt <= timestamp) return false;
+      const user = await this.models.users.findByPk(values.userId, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!user) return false;
+      const consumed = await this.models.passwordResets.destroy({ where: { id }, transaction });
+      if (consumed !== 1) return false;
+      await user.update({ password }, { transaction });
+      await this.models.sessions.update({ active: false }, { where: { userId: values.userId }, transaction });
+      await this.models.passwordResets.destroy({ where: { userId: values.userId }, transaction });
+      return true;
+    });
   }
 
   async createSession(session) {
@@ -481,6 +639,55 @@ class SeqAdapter {
   async verifyPassword(user, password) {
     if (typeof user.verifyPassword === "function") return user.verifyPassword(password);
     return user.password === password;
+  }
+
+
+  async createUser(user) {
+    return (await this.models.users.create(user)).get();
+  }
+
+  async updateUser(id, values) {
+    const user = await this.models.users.findByPk(id);
+    if (!user) return null;
+    await user.update(values);
+    return user.get();
+  }
+
+  async createPasswordReset(reset) {
+    if (!this.models.passwordResets) throw new AdapterError("Modelo passwordResets requerido");
+    await this.models.passwordResets.create(reset);
+  }
+
+  async changePassword(userId, expectedPassword, password) {
+    const engine = this.seq ?? this.models.users.seq;
+    if (!engine?.transaction) throw new AdapterError("Transacciones requeridas para cambiar contrasena");
+    return engine.transaction(async transaction => {
+      const user = await this.models.users.findByPk(userId, { transaction });
+      if (!user || user.get().password !== expectedPassword) return false;
+      await user.update({ password }, { transaction });
+      await this.models.sessions.update({ active: false }, { where: { userId }, transaction });
+      if (this.models.passwordResets) await this.models.passwordResets.destroy({ where: { userId }, transaction });
+      return true;
+    });
+  }
+
+  async resetPassword(id, password, timestamp) {
+    const engine = this.seq ?? this.models.users.seq;
+    if (!engine?.transaction || !this.models.passwordResets) throw new AdapterError("Transacciones y modelo passwordResets requeridos");
+    return engine.transaction(async transaction => {
+      const reset = await this.models.passwordResets.findByPk(id, { transaction });
+      if (!reset) return false;
+      const values = reset.get();
+      if (values.expiresAt <= timestamp) return false;
+      const user = await this.models.users.findByPk(values.userId, { transaction });
+      if (!user) return false;
+      const consumed = await this.models.passwordResets.destroy({ where: { id }, transaction });
+      if (consumed !== 1) return false;
+      await user.update({ password }, { transaction });
+      await this.models.sessions.update({ active: false }, { where: { userId: values.userId }, transaction });
+      await this.models.passwordResets.destroy({ where: { userId: values.userId }, transaction });
+      return true;
+    });
   }
 
   async createSession(session) {

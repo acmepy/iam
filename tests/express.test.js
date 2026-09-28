@@ -326,6 +326,39 @@ test("invalid jwt tokens are rejected", async () => {
   assert.equal(typeof res.body.stack, "string");
 });
 
+test("login defaults to a 365 day JWT lifetime", async () => {
+  for (const expiresIn of [undefined, null]) {
+    const res = createResponse();
+    await auth({ adapter: createAdapter(), jwt: { secret, expiresIn }, logging: false })(
+      createRequest({ method: "POST", path: "/login", body: { username: "admin", password: "1234" } }), res, () => {}
+    );
+    assert.equal(res.body.data.expiresIn, 31536000);
+    const payload = await verifyJwt(res.body.data.token, secret);
+    assert.equal(payload.exp - payload.iat, 31536000);
+  }
+});
+
+test("logout requires a valid bearer token and ignores a supplied sessionId", async () => {
+  const adapter = createAdapter();
+  const middleware = auth({ adapter, jwt: { secret }, logging: false });
+  for (const authorization of [undefined, "Bearer invalid", basic("admin", "1234")]) {
+    const res = createResponse();
+    await middleware(createRequest({ method: "POST", path: "/logout", headers: { authorization }, body: { sessionId: "session-1" } }), res, () => {});
+    assert.equal(res.statusCode, 401);
+    assert.equal((await adapter.findSessionById("session-1")).active, true);
+  }
+  const login = await loginWithPassword(adapter);
+  const token = login.body.data.token;
+  const res = createResponse();
+  await middleware(createRequest({ method: "POST", path: "/logout", headers: { authorization: `Bearer ${token}` }, body: { sessionId: "session-1" } }), res, () => {});
+  assert.equal(res.statusCode, 200);
+  assert.equal((await adapter.findSessionById("session-1")).active, true);
+  assert.equal((await adapter.findSessionById(login.body.data.id)).active, false);
+  const retry = createResponse();
+  await middleware(createRequest({ method: "POST", path: "/logout", headers: { authorization: `Bearer ${token}` } }), retry, () => {});
+  assert.equal(retry.statusCode, 401);
+});
+
 test("post logout deactivates the current session", async () => {
   const adapter = createAdapter();
   const login = await loginWithPassword(adapter);

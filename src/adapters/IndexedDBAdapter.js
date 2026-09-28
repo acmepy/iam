@@ -1,7 +1,7 @@
 import { AdapterError } from "../core/errors.js";
 import { MemoryAdapter } from "./MemoryAdapter.js";
 
-const collections = ["users", "roles", "permissions", "usersRoles", "rolesPermissions", "sessions"];
+const collections = ["users", "roles", "permissions", "usersRoles", "rolesPermissions", "sessions", "passwordResets"];
 const defaultDbName = "iam";
 const defaultStoreName = "collections";
 
@@ -42,6 +42,36 @@ export class IndexedDBAdapter extends MemoryAdapter {
     for (const name of collections) store.put({ name, items: this[name] }, name);
     await done;
     return this;
+  }
+
+  async createUser(user) {
+    const result = await super.createUser(user);
+    await this.save();
+    return result;
+  }
+
+  async updateUser(id, values) {
+    const result = await super.updateUser(id, values);
+    await this.save();
+    return result;
+  }
+
+  async createPasswordReset(reset) {
+    const result = await super.createPasswordReset(reset);
+    await this.save();
+    return result;
+  }
+
+  async changePassword(userId, expectedPassword, password) {
+    const result = await super.changePassword(userId, expectedPassword, password);
+    await this.save();
+    return result;
+  }
+
+  async resetPassword(id, password, timestamp) {
+    const result = await super.resetPassword(id, password, timestamp);
+    await this.save();
+    return result;
   }
 
   async createSession(session) {

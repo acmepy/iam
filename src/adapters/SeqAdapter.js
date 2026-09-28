@@ -24,6 +24,55 @@ export class SeqAdapter {
     return user.password === password;
   }
 
+
+  async createUser(user) {
+    return (await this.models.users.create(user)).get();
+  }
+
+  async updateUser(id, values) {
+    const user = await this.models.users.findByPk(id);
+    if (!user) return null;
+    await user.update(values);
+    return user.get();
+  }
+
+  async createPasswordReset(reset) {
+    if (!this.models.passwordResets) throw new AdapterError("Modelo passwordResets requerido");
+    await this.models.passwordResets.create(reset);
+  }
+
+  async changePassword(userId, expectedPassword, password) {
+    const engine = this.seq ?? this.models.users.seq;
+    if (!engine?.transaction) throw new AdapterError("Transacciones requeridas para cambiar contrasena");
+    return engine.transaction(async transaction => {
+      const user = await this.models.users.findByPk(userId, { transaction });
+      if (!user || user.get().password !== expectedPassword) return false;
+      await user.update({ password }, { transaction });
+      await this.models.sessions.update({ active: false }, { where: { userId }, transaction });
+      if (this.models.passwordResets) await this.models.passwordResets.destroy({ where: { userId }, transaction });
+      return true;
+    });
+  }
+
+  async resetPassword(id, password, timestamp) {
+    const engine = this.seq ?? this.models.users.seq;
+    if (!engine?.transaction || !this.models.passwordResets) throw new AdapterError("Transacciones y modelo passwordResets requeridos");
+    return engine.transaction(async transaction => {
+      const reset = await this.models.passwordResets.findByPk(id, { transaction });
+      if (!reset) return false;
+      const values = reset.get();
+      if (values.expiresAt <= timestamp) return false;
+      const user = await this.models.users.findByPk(values.userId, { transaction });
+      if (!user) return false;
+      const consumed = await this.models.passwordResets.destroy({ where: { id }, transaction });
+      if (consumed !== 1) return false;
+      await user.update({ password }, { transaction });
+      await this.models.sessions.update({ active: false }, { where: { userId: values.userId }, transaction });
+      await this.models.passwordResets.destroy({ where: { userId: values.userId }, transaction });
+      return true;
+    });
+  }
+
   async createSession(session) {
     const values = {id: session.id ?? createSessionId(), ...session};
 

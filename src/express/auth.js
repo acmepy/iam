@@ -13,8 +13,10 @@ import {
 import { createSessionId, now, publicSession } from "../core/utils.js";
 import { setContext } from "./context.js";
 import { log, normalizeLogging } from "./logging.js";
+import { register, updateProfile, changePassword, resetPassword } from "./accounts.js";
 
 const basicRealm = "IAM";
+const defaultExpiresIn = 365 * 24 * 60 * 60;
 
 /**
  * Express authentication middleware with built-in /login, /session and /logout.
@@ -32,6 +34,13 @@ export function auth(options = {}) {
 
   return async function iamAuth(req, res, next) {
     try {
+      if (matches(req, "POST", "/register") && options.registration === true) {
+        return sendData(res.status(201), await register(adapter, req.body));
+      }
+      if (matches(req, "POST", "/reset-password")) {
+        await resetPassword(adapter, req.body);
+        return sendData(res, {});
+      }
       if (matches(req, "POST", "/login")) return handleLogin(req, res, next, { authCore, jwt, options });
       if (matches(req, "GET", "/session")) {
         const session = await authenticateRequest(req, { authCore, jwt, options });
@@ -39,9 +48,14 @@ export function auth(options = {}) {
         log(authCore.logging, "trace", "Sesión consultada", { sessionId: session.id, userId: session.user.id });
         return sendData(res, session);
       }
-      if (matches(req, "POST", "/logout")) return handleLogout(req, res, { authCore, jwt, options, rbac });
+      if (matches(req, "POST", "/logout")) return await handleLogout(req, res, { authCore, jwt, options, rbac });
       const session = await authenticateRequest(req, { authCore, jwt, options });
       attach(req, { authCore, rbac, session });
+      if (matches(req, "PATCH", "/me")) return sendData(res, await updateProfile(adapter, session.user.id, req.body));
+      if (matches(req, "POST", "/me/password")) {
+        await changePassword(adapter, session.user.id, req.body);
+        return sendData(res, {});
+      }
       log(authCore.logging, "trace", "Acceso autenticado", { method: req.method, path: req.path, userId: session.user.id });
       return next();
     } catch (error) {
@@ -74,13 +88,7 @@ async function handleLogin(req, res, next, { authCore, jwt, options }) {
 }
 
 async function handleLogout(req, res, { authCore, jwt, options, rbac }) {
-  const sessionId = req.body?.sessionId;
-
-  if (sessionId) {
-    await authCore.adapter.deactivateSession(sessionId);
-    log(authCore.logging, "info", "Sesión cerrada", { sessionId });
-    return sendData(res, {});
-  }
+  if (!hasBearerToken(req)) throw new TokenRequiredError();
 
   const session = await authenticateRequest(req, { authCore, jwt, options });
   attach(req, { authCore, rbac, session });
@@ -253,7 +261,7 @@ function resolveJwtConfig(options) {
 }
 
 function normalizeExpiresIn(expiresIn) {
-  if (expiresIn === undefined || expiresIn === null) return undefined;
+  if (expiresIn === undefined || expiresIn === null) return defaultExpiresIn;
 
   if (typeof expiresIn === "number" && Number.isFinite(expiresIn) && expiresIn > 0) return Math.floor(expiresIn);
 

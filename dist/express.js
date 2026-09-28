@@ -1,4 +1,5 @@
 import { jwtVerify, SignJWT } from 'jose';
+import { randomBytes, randomUUID, createHash } from 'node:crypto';
 
 class RbacError extends Error {
   constructor(message, status = 400, code = "RBAC_ERROR", errors = {}, stack) {
@@ -59,6 +60,12 @@ class PermissionRequiredError extends RbacError {
 class ForbiddenError extends RbacError {
   constructor(message = "No tiene permisos para realizar esta acción") {
     super(message, 403, "FORBIDDEN");
+  }
+}
+
+class NotFoundError extends RbacError {
+  constructor(message = "Registro no encontrado") {
+    super(message, 404, "NOT_FOUND");
   }
 }
 
@@ -206,7 +213,96 @@ function redact(details) {
   ]));
 }
 
+function requireMethods(adapter, ...methods) {
+  for (const method of methods) {
+    if (typeof adapter?.[method] !== "function") throw new AdapterError(`Adapter requiere ${method}`);
+  }
+}
+
+function bodyFields(body, allowed) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) throw new ValidationError("Cuerpo requerido");
+  if (Object.keys(body).some(key => !allowed.includes(key))) throw new ValidationError("Campo no permitido");
+}
+
+function passwordValue(value) {
+  if (typeof value !== "string" || !value.trim() || value.length > 255) throw new ValidationError("Contrasena requerida (maximo 255 caracteres)");
+  return value;
+}
+
+function profileValues(body, required = false) {
+  const values = {};
+  for (const field of ["name", "email"]) {
+    if (required || Object.hasOwn(body, field)) {
+      if (typeof body[field] !== "string" || !body[field].trim() || body[field].trim().length > 150) throw new ValidationError(`${field} requerido (maximo 150 caracteres)`);
+      values[field] = body[field].trim();
+    }
+  }
+  if (values.email !== undefined && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) throw new ValidationError("Email invalido");
+  return values;
+}
+
+async function register(adapter, body) {
+  requireMethods(adapter, "createUser");
+  bodyFields(body, ["name", "email", "password"]);
+  const values = profileValues(body, true);
+  const password = passwordValue(body.password);
+  return publicUser(await adapter.createUser({ id: randomUUID(), ...values, password, active: true, options: {} }));
+}
+
+async function updateProfile(adapter, userId, body) {
+  requireMethods(adapter, "updateUser");
+  bodyFields(body, ["name", "email"]);
+  const values = profileValues(body);
+  if (!Object.keys(values).length) throw new ValidationError("Indique name o email");
+  const user = await adapter.updateUser(userId, values);
+  if (!user) throw new NotFoundError();
+  return publicUser(user);
+}
+
+async function changePassword(adapter, userId, body) {
+  requireMethods(adapter, "changePassword");
+  bodyFields(body, ["currentPassword", "password"]);
+  const currentPassword = passwordValue(body.currentPassword);
+  const password = passwordValue(body.password);
+  const user = await adapter.findUserById(userId);
+  if (!user || user.active === false) throw new AuthError();
+  const valid = typeof adapter.verifyPassword === "function"
+    ? await adapter.verifyPassword(user, currentPassword)
+    : user.password === currentPassword;
+  if (!valid) throw new AuthError();
+  if (!await adapter.changePassword(userId, user.password, password)) throw new AuthError();
+}
+
+function tokenHash(token) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+/** Server-only: the caller must authorize recovery for the exact userId. */
+async function createPasswordReset({ adapter, userId, resetUrl, expiresIn = 1800 } = {}) {
+  requireMethods(adapter, "findUserById", "createPasswordReset");
+  if (!Number.isSafeInteger(expiresIn) || expiresIn <= 0) throw new ValidationError("expiresIn debe ser segundos positivos");
+  let url;
+  try { url = new URL(resetUrl); } catch { throw new ValidationError("resetUrl debe ser una URL absoluta"); }
+  if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) throw new ValidationError("resetUrl invalida");
+  if (!await adapter.findUserById(userId)) throw new NotFoundError();
+  const token = randomBytes(32).toString("base64url");
+  const expiresAt = Math.floor(Date.now() / 1000) + expiresIn;
+  if (!Number.isSafeInteger(expiresAt)) throw new ValidationError("expiresIn fuera de rango");
+  await adapter.createPasswordReset({ id: tokenHash(token), userId, expiresAt });
+  url.searchParams.set("token", token);
+  return { url: url.href, expiresAt };
+}
+
+async function resetPassword(adapter, body) {
+  requireMethods(adapter, "resetPassword");
+  bodyFields(body, ["token", "password"]);
+  const password = passwordValue(body.password);
+  if (typeof body.token !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(body.token)) throw new TokenInvalidError();
+  if (!await adapter.resetPassword(tokenHash(body.token), password, Math.floor(Date.now() / 1000))) throw new TokenInvalidError();
+}
+
 const basicRealm = "IAM";
+const defaultExpiresIn = 365 * 24 * 60 * 60;
 
 /**
  * Express authentication middleware with built-in /login, /session and /logout.
@@ -224,6 +320,13 @@ function auth(options = {}) {
 
   return async function iamAuth(req, res, next) {
     try {
+      if (matches(req, "POST", "/register") && options.registration === true) {
+        return sendData(res.status(201), await register(adapter, req.body));
+      }
+      if (matches(req, "POST", "/reset-password")) {
+        await resetPassword(adapter, req.body);
+        return sendData(res, {});
+      }
       if (matches(req, "POST", "/login")) return handleLogin(req, res, next, { authCore, jwt, options });
       if (matches(req, "GET", "/session")) {
         const session = await authenticateRequest(req, { authCore, jwt, options });
@@ -231,9 +334,14 @@ function auth(options = {}) {
         log(authCore.logging, "trace", "Sesión consultada", { sessionId: session.id, userId: session.user.id });
         return sendData(res, session);
       }
-      if (matches(req, "POST", "/logout")) return handleLogout(req, res, { authCore, jwt, options, rbac });
+      if (matches(req, "POST", "/logout")) return await handleLogout(req, res, { authCore, jwt, options, rbac });
       const session = await authenticateRequest(req, { authCore, jwt, options });
       attach(req, { authCore, rbac, session });
+      if (matches(req, "PATCH", "/me")) return sendData(res, await updateProfile(adapter, session.user.id, req.body));
+      if (matches(req, "POST", "/me/password")) {
+        await changePassword(adapter, session.user.id, req.body);
+        return sendData(res, {});
+      }
       log(authCore.logging, "trace", "Acceso autenticado", { method: req.method, path: req.path, userId: session.user.id });
       return next();
     } catch (error) {
@@ -266,13 +374,7 @@ async function handleLogin(req, res, next, { authCore, jwt, options }) {
 }
 
 async function handleLogout(req, res, { authCore, jwt, options, rbac }) {
-  const sessionId = req.body?.sessionId;
-
-  if (sessionId) {
-    await authCore.adapter.deactivateSession(sessionId);
-    log(authCore.logging, "info", "Sesión cerrada", { sessionId });
-    return sendData(res, {});
-  }
+  if (!hasBearerToken(req)) throw new TokenRequiredError();
 
   const session = await authenticateRequest(req, { authCore, jwt, options });
   attach(req, { authCore, rbac, session });
@@ -445,7 +547,7 @@ function resolveJwtConfig(options) {
 }
 
 function normalizeExpiresIn(expiresIn) {
-  if (expiresIn === undefined || expiresIn === null) return undefined;
+  if (expiresIn === undefined || expiresIn === null) return defaultExpiresIn;
 
   if (typeof expiresIn === "number" && Number.isFinite(expiresIn) && expiresIn > 0) return Math.floor(expiresIn);
 
@@ -565,4 +667,4 @@ function sendError(res, error) {
   });
 }
 
-export { auth, can, verifyJwt };
+export { auth, can, createPasswordReset, verifyJwt };

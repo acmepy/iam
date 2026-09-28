@@ -22,6 +22,11 @@ function declarations() {
 }
 
 function writeDeclarations() {
+  cpDeclaration("src/types.d.ts", "dist/types.d.ts");
+  mkdirSync("dist/core", { recursive: true });
+  mkdirSync("dist/adapters", { recursive: true });
+  writeFileSync("dist/core/index.d.ts", readFileSync("src/core/index.d.ts", "utf8"));
+  writeFileSync("dist/adapters/index.d.ts", readFileSync("src/adapters/index.d.ts", "utf8"));
   cpDeclaration("src/index.d.ts", "dist/index.d.ts");
   cpDeclaration("src/adapters/index.d.ts", "dist/adapters.d.ts");
   cpDeclaration("src/express/index.d.ts", "dist/express.d.ts");

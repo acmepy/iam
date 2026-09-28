@@ -36,14 +36,37 @@ export const auth = {
     return session;
   },
 
+  async register(values) {
+    return request("/register", { method: "POST", body: JSON.stringify(values) });
+  },
+
+  async updateProfile(values) {
+    const user = await request("/me", { method: "PATCH", headers: sessionHeaders(), body: JSON.stringify(values) });
+    current = { ...current, user };
+    save(defaultState, current);
+    return user;
+  },
+
+  async changePassword(currentPassword, password) {
+    await request("/me/password", { method: "POST", headers: sessionHeaders(), body: JSON.stringify({ currentPassword, password }) });
+    current = null;
+    remove(defaultState);
+  },
+
+  async resetPassword(token, password) {
+    await request("/reset-password", { method: "POST", body: JSON.stringify({ token, password }) });
+    current = null;
+    remove(defaultState);
+  },
+
   /**
    * @returns {Promise<void>}
    */
   async logout() {
-    if (current?.id) {
+    if (current?.token) {
       await request("/logout", {
         method: "POST",
-        body: JSON.stringify({ sessionId: current.id })
+        headers: sessionHeaders()
       });
     }
 
@@ -67,11 +90,17 @@ async function loginWithPassword({ username, password, options = {} }) {
 }
 
 async function loginWithToken(token) {
-  return request("/session", {
+  const session = await request("/session", {
     headers: {
       Authorization: `Bearer ${token}`
     }
   });
+  return { ...session, token };
+}
+
+function sessionHeaders() {
+  if (!current?.token) throw new RbacError("Sesion requerida", 401);
+  return { Authorization: `Bearer ${current.token}` };
 }
 
 async function request(path, init = {}) {
@@ -87,7 +116,8 @@ async function request(path, init = {}) {
     throw new RbacError(`Solicitud fallida con estado ${response.status}`, response.status);
   }
 
-  return response.json();
+  const result = await response.json();
+  return result.data;
 }
 
 function load({ storage, storageKey }) {

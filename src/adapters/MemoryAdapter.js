@@ -1,6 +1,6 @@
 import { now } from "../core/utils.js";
 
-const collections = ["users", "roles", "permissions", "usersRoles", "rolesPermissions", "sessions"];
+const collections = ["users", "roles", "permissions", "usersRoles", "rolesPermissions", "sessions", "passwordResets"];
 
 /**
  * In-memory IAM adapter, useful for tests, demos, and small embedded setups.
@@ -23,6 +23,47 @@ export class MemoryAdapter {
 
   async verifyPassword(user, password) {
     return user.password === password;
+  }
+
+  async createUser(user) {
+    if (this.users.some(item => item.id === user.id)) throw new Error("User id duplicado");
+    this.users.push({ ...user });
+    return { ...user };
+  }
+
+  async updateUser(id, values) {
+    const user = this.users.find(item => item.id === id);
+    if (!user) return null;
+    Object.assign(user, values, { updatedAt: now() });
+    return { ...user };
+  }
+
+  async createPasswordReset(reset) {
+    this.passwordResets.push({ ...reset });
+  }
+
+  async changePassword(userId, expectedPassword, password) {
+    const user = this.users.find(item => item.id === userId);
+    if (!user || user.password !== expectedPassword) return false;
+    this.replacePassword(user, password);
+    return true;
+  }
+
+  async resetPassword(id, password, timestamp) {
+    const reset = this.passwordResets.find(item => item.id === id && item.expiresAt > timestamp);
+    const user = reset && this.users.find(item => item.id === reset.userId);
+    if (!user) return false;
+    this.replacePassword(user, password);
+    return true;
+  }
+
+  replacePassword(user, password) {
+    user.password = password;
+    user.updatedAt = now();
+    this.passwordResets = this.passwordResets.filter(item => item.userId !== user.id);
+    for (const session of this.sessions) {
+      if (session.userId === user.id) Object.assign(session, { active: false, updatedAt: now() });
+    }
   }
 
   async createSession(session) {

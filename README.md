@@ -36,6 +36,51 @@ const rbac = new RBAC({ adapter });
 console.log(await rbac.can("admin", "users.list")); // true
 ```
 
+## Registro, perfil y recuperacion de contrasena
+
+Habilita el registro expresamente con `auth({ adapter, registration: true, jwt: { secret } })`.
+Por defecto el registro esta deshabilitado. Las respuestas mantienen el formato `{ ok: true, data: ... }`.
+
+| Ruta | Cuerpo | Acceso |
+| --- | --- | --- |
+| `POST /register` | `{ name, email, password }` | Publico, con `registration: true` |
+| `PATCH /me` | `{ name?, email? }` | Usuario autenticado |
+| `POST /me/password` | `{ currentPassword, password }` | Usuario autenticado |
+| `POST /reset-password` | `{ token, password }` | Credencial de recuperacion valida |
+
+El registro devuelve el usuario publico con estado HTTP 201; no inicia sesion. El servidor genera su `id`, lo crea activo, con `options: {}` y sin roles. El correo no es unico. Usa el `id` devuelto como `username` para identificar inequívocamente la cuenta en el login; la busqueda existente por nombre o correo devuelve la primera coincidencia.
+
+La edicion opera exclusivamente sobre la identidad autenticada. Registro y perfil rechazan campos adicionales, incluidos roles, permisos, estado y `options`. Nombre y correo se recortan y admiten hasta 150 caracteres; el correo debe tener formato valido. Las contrasenas no vacias admiten hasta 255 caracteres y conservan el mecanismo de almacenamiento y comparacion existente. `options` en login conserva su comportamiento previo.
+
+Para generar un enlace, llama esta funcion **desde el servidor**, despues de autorizar la recuperacion de la cuenta por su `userId`:
+
+```js
+import { createPasswordReset } from "iam/express";
+
+const { url, expiresAt } = await createPasswordReset({
+  adapter,
+  userId: "id-exacto-del-usuario",
+  resetUrl: "https://mi-aplicacion.com/restablecer",
+  expiresIn: 1800
+});
+```
+
+`url` contiene el parametro `token`; `expiresAt` es el vencimiento en segundos Unix. `expiresIn` se expresa en segundos y vale 1800 por defecto. La URL base la configura el servidor. No existe una ruta publica que genere o entregue estos enlaces.
+
+La pantalla de la aplicacion debe extraer `token` del enlace y enviar `POST /reset-password` con la nueva contrasena. IAM no crea esa pantalla ni envia correos, SMS o WhatsApp. Abrir el enlace no consume la credencial: se consume al restablecer la contrasena correctamente.
+
+Se persiste una huella SHA-256 de la credencial aleatoria, no el token del enlace. Cambiar o restablecer la contrasena invalida todas las sesiones y credenciales de recuperacion de esa cuenta; requiere un nuevo login y no reactiva usuarios desactivados.
+
+### Persistencia
+
+Los modelos SQL incluyen la nueva tabla `passwordResets`, configurable con `tableNames.passwordResets`. Contiene `id` (huella de 64 caracteres), `userId`, `expiresAt` (segundos Unix) y timestamps. En bases existentes hay que crear esta tabla antes de usar recuperacion; con modelos personalizados hay que proporcionar `models.passwordResets`. No se agrega unicidad al correo ni se cambia la tabla de usuarios.
+
+Las operaciones SQL de cambio y restablecimiento necesitan transacciones: `SeqAdapter` usa `seq.transaction` y `SequelizeAdapter` usa `sequelize.transaction`. La eliminacion condicional de la credencial y el cambio de contrasena se ejecutan junto con la invalidacion de sesiones en la misma transaccion. SQLite en Seq rechaza transacciones simultaneas en una conexion; una solicitud rechazada por ese motivo puede reintentarse.
+
+Los adaptadores propios deben implementar `createUser`, `updateUser`, `createPasswordReset`, `changePassword` y `resetPassword` para las funciones correspondientes. `changePassword(userId, expectedPassword, password)` comprueba la contrasena almacenada esperada; `resetPassword(id, password, timestamp)` recibe la huella y valida el vencimiento. Ambos devuelven un booleano y deben invalidar sesiones y credenciales de recuperacion atomicamente. Los adaptadores de memoria y almacenamiento del navegador son para uso local; no coordinan recuperaciones entre procesos o pestanas.
+
+El cliente `iam/browser` expone `auth.register({ name, email, password })`, `auth.updateProfile({ name, email })`, `auth.changePassword(currentPassword, password)` y `auth.resetPassword(token, password)`. El cambio y restablecimiento exitosos limpian la sesion local.
+
 ## RBAC
 
 ```js
@@ -84,6 +129,7 @@ app.get("/users", can("users.list"), (req, res) => {
 `auth(options)` admite:
 
 - Tokens bearer JWT con `auth({ adapter, jwt: { secret, expiresIn } })`.
+- Si `jwt.expiresIn` se omite o es `null`, los nuevos tokens vencen en 365 dias (31536000 segundos). Un valor explicito conserva la duracion configurada.
 - Autenticacion basica con `Authorization: Basic ...`.
 - Challenge nativo del navegador con `WWW-Authenticate: Basic realm="IAM"` cuando faltan credenciales.
 - Deteccion automatica de estrategia con `auth({ adapter, jwt: { secret } })`.
@@ -92,7 +138,7 @@ Rutas manejadas por el middleware:
 
 - `POST /login`: valida credenciales y responde `{ ok: true, data: { ...session, token, expiresIn } }`.
 - `GET /session`: requiere Basic o Bearer JWT y responde `{ ok: true, data: { ...session } }`.
-- `POST /logout`: desactiva la sesion actual y responde `{ ok: true, data: {} }`.
+- `POST /logout`: sin cuerpo, requiere `Authorization: Bearer <token>`, desactiva exclusivamente la sesion del token y responde `{ ok: true, data: {} }`. Un `sessionId` enviado en el cuerpo se ignora; Basic no permite cerrar sesiones por esta ruta.
 
 Formato de respuestas:
 
@@ -163,10 +209,20 @@ await auth.logout();
 
 El cliente del navegador puede usar el servidor Express anterior:
 
-- `POST /login` para login con usuario y contrasena.
-- `POST /logout` para cerrar sesion.
-- `GET /session` para login con token bearer.
-- Basic sin credenciales dispara el dialogo nativo del navegador por `WWW-Authenticate`.
+| Metodo del cliente | Operacion del servidor |
+| --- | --- |
+| `auth.register({ name, email, password })` | `POST /register`; requiere registro habilitado en el servidor |
+| `auth.login({ username, password, options })` | `POST /login` |
+| `auth.login({ token })` | `GET /session` con Bearer |
+| `auth.updateProfile({ name, email })` | `PATCH /me` con Bearer; ambos campos son opcionales, pero debe enviarse al menos uno |
+| `auth.changePassword(currentPassword, password)` | `POST /me/password` con Bearer |
+| `auth.resetPassword(token, password)` | `POST /reset-password`; no requiere sesion iniciada |
+| `auth.logout()` | `POST /logout` con Bearer y sin cuerpo |
+| `auth.getSession()` | Devuelve la sesion local, sin consultar al servidor |
+
+`register` devuelve el usuario creado sin iniciar sesion. `updateProfile` actualiza tambien el usuario de la sesion local. El cambio o restablecimiento de contrasena y el logout limpian la sesion local cuando terminan correctamente.
+
+El token para `resetPassword` es el parametro `token` del enlace de recuperacion. El enlace se genera exclusivamente en el servidor con `createPasswordReset`; el cliente no emite credenciales de recuperacion ni envia notificaciones.
 
 ## OpenAPI y Postman por permisos
 

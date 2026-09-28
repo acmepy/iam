@@ -46,6 +46,14 @@ const modelDefinitions = [
     }
   },
   {
+    name: "passwordResets",
+    attributes: {
+      id: { type: "string", length: 64, primaryKey: true, allowNull: false },
+      userId: { type: "string", length: 100, allowNull: false, references: { model: "users", key: "id" } },
+      expiresAt: { type: "integer", allowNull: false }
+    }
+  },
+  {
     name: "roles",
     attributes: {
       id: { type: "integer", primaryKey: true, autoIncrement: true },

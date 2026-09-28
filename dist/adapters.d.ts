@@ -5,6 +5,7 @@ import type {
   Id,
   KeyValueStorage,
   PermissionData,
+  PasswordResetData,
   RoleData,
   RolePermissionData,
   SessionData,
@@ -20,6 +21,12 @@ export class MemoryAdapter implements Adapter {
   usersRoles: UserRoleData[];
   rolesPermissions: RolePermissionData[];
   sessions: SessionData[];
+  passwordResets: PasswordResetData[];
+  createUser(user: UserData): Promise<UserData>;
+  updateUser(id: Id, values: Partial<Pick<UserData, "name" | "email">>): Promise<UserData | null>;
+  createPasswordReset(reset: PasswordResetData): Promise<void>;
+  changePassword(userId: Id, expectedPassword: string | undefined, password: string): Promise<boolean>;
+  resetPassword(id: string, password: string, timestamp: number): Promise<boolean>;
   findUserByUsername(username: string): Promise<UserData | null>;
   findUserById(id: Id): Promise<UserData | null>;
   verifyPassword(user: UserData, password: string): Promise<boolean>;
@@ -61,6 +68,11 @@ export class SequelizeAdapter implements Adapter {
   constructor(options?: { sequelize?: unknown; models?: Record<string, unknown>; tableNames?: Record<string, string> });
   sequelize?: unknown;
   models: Record<string, unknown>;
+  createUser(user: UserData): Promise<UserData>;
+  updateUser(id: Id, values: Partial<Pick<UserData, "name" | "email">>): Promise<UserData | null>;
+  createPasswordReset(reset: PasswordResetData): Promise<void>;
+  changePassword(userId: Id, expectedPassword: string | undefined, password: string): Promise<boolean>;
+  resetPassword(id: string, password: string, timestamp: number): Promise<boolean>;
   findUserByUsername(username: string): Promise<UserData | null>;
   findUserById(id: Id): Promise<UserData | null>;
   verifyPassword(user: UserData, password: string): Promise<boolean>;

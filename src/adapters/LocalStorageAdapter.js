@@ -11,6 +11,36 @@ export class LocalStorageAdapter extends MemoryAdapter {
     this.key = key;
   }
 
+  async createUser(user) {
+    const result = await super.createUser(user);
+    await this.save();
+    return result;
+  }
+
+  async updateUser(id, values) {
+    const result = await super.updateUser(id, values);
+    await this.save();
+    return result;
+  }
+
+  async createPasswordReset(reset) {
+    const result = await super.createPasswordReset(reset);
+    await this.save();
+    return result;
+  }
+
+  async changePassword(userId, expectedPassword, password) {
+    const result = await super.changePassword(userId, expectedPassword, password);
+    await this.save();
+    return result;
+  }
+
+  async resetPassword(id, password, timestamp) {
+    const result = await super.resetPassword(id, password, timestamp);
+    await this.save();
+    return result;
+  }
+
   async createSession(session) {
     const result = await super.createSession(session);
     this.save();
@@ -31,7 +61,7 @@ export class LocalStorageAdapter extends MemoryAdapter {
 
   save() {
     if (!this.storage) throw new AdapterError("localStorage no está disponible");
-    this.storage.setItem(this.key, JSON.stringify({users: this.users, roles: this.roles, permissions: this.permissions, usersRoles: this.usersRoles, rolesPermissions: this.rolesPermissions, sessions: this.sessions}));
+    this.storage.setItem(this.key, JSON.stringify({users: this.users, roles: this.roles, permissions: this.permissions, usersRoles: this.usersRoles, rolesPermissions: this.rolesPermissions, sessions: this.sessions, passwordResets: this.passwordResets}));
   }
 }
 

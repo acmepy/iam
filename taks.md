@@ -2,6 +2,8 @@
 
 Estados: [] pendiente, [X] completado.
 
+- [X] Corregir llamadas y pruebas para conservar el formato de log [IAM], operación, txId, mensaje y detalles; 49 pruebas y build correctos.
+
 - [X] Simplificar normalizeLogging conservando niveles, valores por defecto y contexto del logger; verificado con 49 pruebas y build.
 
 - [X] Agregar txId a los logs cuando exista en el contexto; verificado con pruebas de aislamiento concurrente y ausencia de contexto.

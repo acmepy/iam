@@ -25,26 +25,26 @@ test("logging includes the current transaction without mixing concurrent context
   const storage = new AsyncLocalStorage();
   const events = [];
   const logging = normalizeLogging({
-    trace: (...args) => events.push(args[2])
+    trace: (...args) => events.push(args)
   }, () => storage.getStore());
   await Promise.all(["tx-1", "tx-2"].map((txId) => storage.run({ txId }, async () => {
     await new Promise((resolve) => setImmediate(resolve));
-    log(logging, "trace", "Acceso autenticado", { userId: txId, token: "secret" });
+    log(logging, "trace", "auth", "Acceso autenticado", { userId: txId, token: "secret" });
   })));
   assert.equal(events.length, 2);
   for (const event of events) {
-    assert.equal(event.txId, event.userId);
-    assert.equal(event.token, "[REDACTED]");
+    assert.deepEqual(event.slice(0, 4), ["[IAM]", "auth", event[4].userId, "Acceso autenticado"]);
+    assert.equal(event[4].token, "[REDACTED]");
   }
-  log(logging, "trace", "Sin contexto", { userId: "admin" });
-  assert.deepEqual(events[2], { userId: "admin" });
+  log(logging, "trace", "auth", "Sin contexto", { userId: "admin" });
+  assert.deepEqual(events[2], ["[IAM]", "auth", "", "Sin contexto", { userId: "admin" }]);
 });
 
 test("logging omits null or missing transaction IDs", () => {
   for (const context of [undefined, null, {}, { txId: null }]) {
     const logging = normalizeLogging({
-      info: (...args) => assert.deepEqual(args[2], { userId: "admin" })
+      info: (...args) => assert.deepEqual(args, ["[IAM]", "auth", "", "Sesión iniciada", { userId: "admin" }])
     }, () => context);
-    log(logging, "info", "Sesión iniciada", { userId: "admin" });
+    log(logging, "info", "auth", "Sesión iniciada", { userId: "admin" });
   }
 });

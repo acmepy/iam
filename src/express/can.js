@@ -23,16 +23,16 @@ export function can(permission) {
 
       const allowed = await context.rbac.can(userId, permission);
       if (!allowed) {
-        log(context.auth.logging, "info", "Permiso denegado", { userId, permission });
+        log(context.auth.logging, "info", "can", "Permiso denegado", { userId, permission });
         throw new ForbiddenError();
       }
 
-      log(context.auth.logging, "trace", "Permiso concedido", { userId, permission });
+      log(context.auth.logging, "trace", "can", "Permiso concedido", { userId, permission });
 
       return next();
     } catch (error) {
       const context = getContext(req);
-      if (Number(error?.status ?? 500) >= 500) log(context?.auth?.logging, "error", "Error de autorización", { userId: req.session?.user?.id, permission, error: error.message, status: error.status ?? 500 });
+      if (Number(error?.status ?? 500) >= 500) log(context?.auth?.logging, "error", "can", "Error de autorización", { userId: req.session?.user?.id, permission, error: error.message, status: error.status ?? 500 });
       if (!(Number(error?.status ?? 500) < 500)) return next(error);
       return sendError(res, error);
     }

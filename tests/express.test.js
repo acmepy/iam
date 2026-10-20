@@ -107,7 +107,7 @@ test("auth accepts a Seq-compatible logger instance", async () => {
     await can("users.list")(req, res, () => {});
   });
 
-  assert.ok(events.some((event) => event.context === logger && event.args[0] === "[IAM]" && event.args[1] === "Permiso concedido"));
+  assert.ok(events.some((event) => event.context === logger && event.args[0] === "[IAM]" && event.args[1] === "can" && event.args[3] === "Permiso concedido"));
 });
 
 test("auth reads its context provider for authentication and authorization logs", async () => {
@@ -128,9 +128,9 @@ test("auth reads its context provider for authentication and authorization logs"
       await can("users.list")(req, res, () => {});
     });
   }
-  assert.deepEqual(events.map((event) => event[1]), ["Acceso autenticado", "Permiso concedido", "Acceso autenticado", "Permiso concedido"]);
-  assert.deepEqual(events.map((event) => event[2].txId), ["request-1", "request-1", undefined, undefined]);
-  assert.ok(events.slice(2).every((event) => !Object.hasOwn(event[2], "txId")));
+  assert.deepEqual(events.map((event) => event[3]), ["Acceso autenticado", "Permiso concedido", "Acceso autenticado", "Permiso concedido"]);
+  assert.deepEqual(events.map((event) => event[2]), ["request-1", "request-1", "", ""]);
+  assert.ok(events.slice(2).every((event) => !Object.hasOwn(event[4], "txId")));
 });
 
 test("application list responses use data as the collection", async () => {

@@ -191,12 +191,11 @@ function normalizeLogging(logging = true, getContext) {
   return normalized;
 }
 
-function log(logging, level, message, details) {
+function log(logging, level, path, message, details) {
   const logger = logging?.[levels.has(level) ? level : "info"];
   if (typeof logger !== "function") return;
-  const txId = logging.getContext?.()?.txId;
-  const values = txId == null ? details : { ...details, txId };
-  logger.call(logging.target ?? logging, "[IAM]", message, redact(values));
+  const txId = logging.getContext?.()?.txId || '';
+  logger.call(logging.target ?? logging, "[IAM]", path, txId, message, redact(details));
 }
 
 function redact(details) {
@@ -325,7 +324,7 @@ function auth(options = {}) {
       if (matches(req, "GET", "/session")) {
         const session = await authenticateRequest(req, { authCore, jwt, options });
         attach(req, { authCore, rbac, session });
-        log(authCore.logging, "trace", "Sesión consultada", { sessionId: session.id, userId: session.user.id });
+        log(authCore.logging, "trace", "auth", "Sesión consultada", { sessionId: session.id, userId: session.user.id });
         return sendData(res, session);
       }
       if (matches(req, "POST", "/logout")) return await handleLogout(req, res, { authCore, jwt, options, rbac });
@@ -336,10 +335,10 @@ function auth(options = {}) {
         await changePassword(adapter, session.user.id, req.body);
         return sendData(res, {});
       }
-      log(authCore.logging, "trace", "Acceso autenticado", { method: req.method, path: req.path, userId: session.user.id });
+      log(authCore.logging, "trace", "auth", "Acceso autenticado", { method: req.method, path: req.path, userId: session.user.id });
       return next();
     } catch (error) {
-      log(authCore.logging, "error", "Error de autenticación", { method: req.method, path: req.path, error: error.message, status: error.status ?? 500 });
+      log(authCore.logging, "error", "auth", "Error de autenticación", { method: req.method, path: req.path, error: error.message, status: error.status ?? 500 });
       if (!(Number(error?.status ?? 500) < 500)) return next(error);
       return sendError$1(res, error, shouldChallenge(error, req));
     }
@@ -357,11 +356,11 @@ async function handleLogin(req, res, next, { authCore, jwt, options }) {
     const expiresIn = normalizeExpiresIn(jwt.expiresIn);
     const token = await signJwt({ sessionId: session.id }, jwt.secret, { expiresIn });
     if (session.id) await authCore.adapter.updateSession(session.id, { token });
-    log(authCore.logging, "info", "Sesión iniciada", { sessionId: session.id, userId: user.id });
+    log(authCore.logging, "info", "auth", "Sesión iniciada", { sessionId: session.id, userId: user.id });
 
     return sendData(res, { ...publicValue, token, expiresIn });
   } catch (error) {
-    log(authCore.logging, "error", "Error de inicio de sesión", { method: req.method, path: req.path, error: error.message, status: error.status ?? 500 });
+    log(authCore.logging, "error", "auth", "Error de inicio de sesión", { method: req.method, path: req.path, error: error.message, status: error.status ?? 500 });
     if (!shouldSendError(error)) return next(error);
     return sendLoginError(res, error);
   }
@@ -373,7 +372,7 @@ async function handleLogout(req, res, { authCore, jwt, options, rbac }) {
   const session = await authenticateRequest(req, { authCore, jwt, options });
   attach(req, { authCore, rbac, session });
   await authCore.adapter.deactivateSession(session.id);
-  log(authCore.logging, "info", "Sesión cerrada", { sessionId: session.id, userId: session.user.id });
+  log(authCore.logging, "info", "auth", "Sesión cerrada", { sessionId: session.id, userId: session.user.id });
   return sendData(res, {});
 }
 
@@ -627,16 +626,16 @@ function can(permission) {
 
       const allowed = await context.rbac.can(userId, permission);
       if (!allowed) {
-        log(context.auth.logging, "info", "Permiso denegado", { userId, permission });
+        log(context.auth.logging, "info", "can", "Permiso denegado", { userId, permission });
         throw new ForbiddenError();
       }
 
-      log(context.auth.logging, "trace", "Permiso concedido", { userId, permission });
+      log(context.auth.logging, "trace", "can", "Permiso concedido", { userId, permission });
 
       return next();
     } catch (error) {
       const context = getContext(req);
-      if (Number(error?.status ?? 500) >= 500) log(context?.auth?.logging, "error", "Error de autorización", { userId: req.session?.user?.id, permission, error: error.message, status: error.status ?? 500 });
+      if (Number(error?.status ?? 500) >= 500) log(context?.auth?.logging, "error", "can", "Error de autorización", { userId: req.session?.user?.id, permission, error: error.message, status: error.status ?? 500 });
       if (!(Number(error?.status ?? 500) < 500)) return next(error);
       return sendError(res, error);
     }

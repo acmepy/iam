@@ -16,7 +16,7 @@ export function log(logging, level, path, message, details) {
   const logger = logging?.[levels.has(level) ? level : "info"];
   if (typeof logger !== "function") return;
   const txId = logging.getContext?.()?.txId || '';
-  logger.call(logging.target ?? logging, "[IAM]", path, txId, message, redact(details));
+  logger.call(logging.target ?? logging, "[IAM]", `[${path}]`, txId, message, redact(details));
 }
 
 function redact(details) {

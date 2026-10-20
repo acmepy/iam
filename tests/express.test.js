@@ -107,7 +107,7 @@ test("auth accepts a Seq-compatible logger instance", async () => {
     await can("users.list")(req, res, () => {});
   });
 
-  assert.ok(events.some((event) => event.context === logger && event.args[0] === "[IAM]" && event.args[1] === "can" && event.args[3] === "Permiso concedido"));
+  assert.ok(events.some((event) => event.context === logger && event.args[0] === "[IAM]" && event.args[1] === "[can]" && event.args[3] === "Permiso concedido"));
 });
 
 test("auth reads its context provider for authentication and authorization logs", async () => {

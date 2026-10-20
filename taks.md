@@ -2,6 +2,8 @@
 
 Estados: [] pendiente, [X] completado.
 
+- [X] Eliminar logging.test.js y verificar la suite restante, conservando las pruebas de integración de logging en Express; 46 pruebas correctas.
+
 - [X] Corregir llamadas y pruebas para conservar el formato de log [IAM], operación, txId, mensaje y detalles; 49 pruebas y build correctos.
 
 - [X] Simplificar normalizeLogging conservando niveles, valores por defecto y contexto del logger; verificado con 49 pruebas y build.

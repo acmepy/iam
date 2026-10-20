@@ -1,30 +1,21 @@
 const levels = new Set(["info", "trace", "warn", "error"]);
 
-export function normalizeLogging(logging) {
-  const disabled = { info: false, trace: false, warn: false, error: false };
-  const defaults = {
-    info: console.log.bind(console),
-    trace: console.log.bind(console),
-    warn: console.log.bind(console),
-    error: console.error.bind(console)
-  };
+export function normalizeLogging(logging = true, getContext) {
+  if (logging !== true && !["object", "function"].includes(typeof logging)) return null;
+  if (logging === null) return null;
 
-  if (logging === undefined || logging === true) return { ...defaults };
-  if (logging === false || logging === null || (typeof logging !== "object" && typeof logging !== "function")) return disabled;
-  return {
-    info: logging.info ?? defaults.info,
-    trace: logging.trace ?? defaults.trace,
-    warn: logging.warn ?? defaults.warn,
-    error: logging.error ?? defaults.error,
-    getContext: logging.getContext,
-    target: logging
-  };
+  const normalized = { getContext, target: logging };
+  for (const level of levels) {
+    const fallback = level === "error" ? console.error : console.log;
+    normalized[level] = logging[level] ?? fallback.bind(console);
+  }
+  return normalized;
 }
 
 export function log(logging, level, message, details) {
   const logger = logging?.[levels.has(level) ? level : "info"];
   if (typeof logger !== "function") return;
-  const txId = logging.getContext?.call(logging.target ?? logging)?.txId;
+  const txId = logging.getContext?.()?.txId;
   const values = txId == null ? details : { ...details, txId };
   logger.call(logging.target ?? logging, "[IAM]", message, redact(values));
 }

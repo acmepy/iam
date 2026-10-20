@@ -179,31 +179,22 @@ function getContext(req) {
 
 const levels = new Set(["info", "trace", "warn", "error"]);
 
-function normalizeLogging(logging) {
-  const disabled = { info: false, trace: false, warn: false, error: false };
-  const defaults = {
-    info: console.log.bind(console),
-    trace: console.log.bind(console),
-    warn: console.log.bind(console),
-    error: console.error.bind(console)
-  };
+function normalizeLogging(logging = true, getContext) {
+  if (logging !== true && !["object", "function"].includes(typeof logging)) return null;
+  if (logging === null) return null;
 
-  if (logging === undefined || logging === true) return { ...defaults };
-  if (logging === false || logging === null || (typeof logging !== "object" && typeof logging !== "function")) return disabled;
-  return {
-    info: logging.info ?? defaults.info,
-    trace: logging.trace ?? defaults.trace,
-    warn: logging.warn ?? defaults.warn,
-    error: logging.error ?? defaults.error,
-    getContext: logging.getContext,
-    target: logging
-  };
+  const normalized = { getContext, target: logging };
+  for (const level of levels) {
+    const fallback = level === "error" ? console.error : console.log;
+    normalized[level] = logging[level] ?? fallback.bind(console);
+  }
+  return normalized;
 }
 
 function log(logging, level, message, details) {
   const logger = logging?.[levels.has(level) ? level : "info"];
   if (typeof logger !== "function") return;
-  const txId = logging.getContext?.call(logging.target ?? logging)?.txId;
+  const txId = logging.getContext?.()?.txId;
   const values = txId == null ? details : { ...details, txId };
   logger.call(logging.target ?? logging, "[IAM]", message, redact(values));
 }
@@ -319,7 +310,7 @@ function auth(options = {}) {
 
   const jwt = resolveJwtConfig(options);
   const rbac = new RBAC({ adapter });
-  const authCore = { adapter, rbac, logging: normalizeLogging(options.logging) };
+  const authCore = { adapter, rbac, getContext: options.getContext, logging: normalizeLogging(options.logging, options.getContext) };
 
   return async function iamAuth(req, res, next) {
     try {
@@ -645,9 +636,7 @@ function can(permission) {
       return next();
     } catch (error) {
       const context = getContext(req);
-      if (Number(error?.status ?? 500) >= 500) {
-        log(context?.auth?.logging, "error", "Error de autorización", { userId: req.session?.user?.id, permission, error: error.message, status: error.status ?? 500 });
-      }
+      if (Number(error?.status ?? 500) >= 500) log(context?.auth?.logging, "error", "Error de autorización", { userId: req.session?.user?.id, permission, error: error.message, status: error.status ?? 500 });
       if (!(Number(error?.status ?? 500) < 500)) return next(error);
       return sendError(res, error);
     }
@@ -663,11 +652,7 @@ function can(permission) {
 function sendError(res, error) {
   const status = error.status ?? 500;
   const message = error.message ?? "Error";
-  return res.status(status).json({
-    ok: false,
-    message,
-    stack: error.stack
-  });
+  return res.status(status).json({ ok: false, message, stack: error.stack});
 }
 
 export { auth, can, createPasswordReset, verifyJwt };

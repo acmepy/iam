@@ -32,9 +32,7 @@ export function can(permission) {
       return next();
     } catch (error) {
       const context = getContext(req);
-      if (Number(error?.status ?? 500) >= 500) {
-        log(context?.auth?.logging, "error", "Error de autorización", { userId: req.session?.user?.id, permission, error: error.message, status: error.status ?? 500 });
-      }
+      if (Number(error?.status ?? 500) >= 500) log(context?.auth?.logging, "error", "Error de autorización", { userId: req.session?.user?.id, permission, error: error.message, status: error.status ?? 500 });
       if (!(Number(error?.status ?? 500) < 500)) return next(error);
       return sendError(res, error);
     }
@@ -50,9 +48,5 @@ export function can(permission) {
 function sendError(res, error) {
   const status = error.status ?? 500;
   const message = error.message ?? "Error";
-  return res.status(status).json({
-    ok: false,
-    message,
-    stack: error.stack
-  });
+  return res.status(status).json({ ok: false, message, stack: error.stack});
 }

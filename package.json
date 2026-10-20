@@ -1,6 +1,6 @@
 {
   "name": "iam",
-  "version": "0.9.11",
+  "version": "0.9.12",
   "description": "Small IAM authentication, authorization, and session library for JavaScript.",
   "type": "module",
   "main": "./dist/express.js",

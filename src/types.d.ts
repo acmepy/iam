@@ -17,7 +17,6 @@ export type ExpressMiddleware = (
 export type AuthStrategy = "jwt" | "basic";
 
 export type Logging = boolean | {
-  getContext?: () => { txId?: string | number | null } | null | undefined;
   info?: ((...args: unknown[]) => void) | false;
   trace?: ((...args: unknown[]) => void) | false;
   warn?: ((...args: unknown[]) => void) | false;
@@ -35,6 +34,7 @@ export interface ExpressAuthOptions {
   strategies?: AuthStrategy[];
   createSession?: boolean;
   logging?: Logging;
+  getContext?: () => (Dict & { txId?: string | number | null }) | null | undefined;
 }
 
 export interface BrowserAuthOptions {

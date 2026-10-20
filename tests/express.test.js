@@ -110,6 +110,29 @@ test("auth accepts a Seq-compatible logger instance", async () => {
   assert.ok(events.some((event) => event.context === logger && event.args[0] === "[IAM]" && event.args[1] === "Permiso concedido"));
 });
 
+test("auth reads its context provider for authentication and authorization logs", async () => {
+  const events = [];
+  let context = { txId: "request-1", tenant: "example" };
+  const middleware = auth({
+    adapter: createAdapter(),
+    jwt: { secret },
+    getContext: () => context,
+    logging: { trace: (...args) => events.push(args) }
+  });
+  for (const current of [context, null]) {
+    context = current;
+    const req = createRequest({ method: "GET", path: "/users", headers: { authorization: basic("admin", "1234") } });
+    const res = createResponse();
+    await middleware(req, res, async () => {
+      assert.equal(getContext(req).auth.getContext(), current);
+      await can("users.list")(req, res, () => {});
+    });
+  }
+  assert.deepEqual(events.map((event) => event[1]), ["Acceso autenticado", "Permiso concedido", "Acceso autenticado", "Permiso concedido"]);
+  assert.deepEqual(events.map((event) => event[2].txId), ["request-1", "request-1", undefined, undefined]);
+  assert.ok(events.slice(2).every((event) => !Object.hasOwn(event[2], "txId")));
+});
+
 test("application list responses use data as the collection", async () => {
   const req = createRequest({
     method: "GET",

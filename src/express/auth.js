@@ -30,7 +30,7 @@ export function auth(options = {}) {
 
   const jwt = resolveJwtConfig(options);
   const rbac = new RBAC({ adapter });
-  const authCore = { adapter, rbac, logging: normalizeLogging(options.logging) };
+  const authCore = { adapter, rbac, getContext: options.getContext, logging: normalizeLogging(options.logging, options.getContext) };
 
   return async function iamAuth(req, res, next) {
     try {

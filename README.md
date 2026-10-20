@@ -316,6 +316,8 @@ console.log(await rbac.can("admin", "users.list")); // true
 
 `auth` usa la misma convención de `logging` que `Seq`: por defecto registra eventos; usa `false` para desactivarlos o un objeto con handlers por nivel. Los eventos no incluyen contraseñas, tokens ni secretos.
 
+La opción `getContext` de `auth` permite consultar el contexto actual de la aplicación: `auth({ adapter, getContext, logging: logger })`. Los logs incluyen `txId` cuando `getContext()?.txId` tiene un valor distinto de `null` o `undefined`. La función se consulta en cada evento y puede devolver otros datos de contexto; estos no se agregan al log.
+
 ```js
 app.use(auth({
   adapter,

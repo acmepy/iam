@@ -56,10 +56,10 @@ export function auth(options = {}) {
         await changePassword(adapter, session.user.id, req.body);
         return sendData(res, {});
       }
-      log(authCore.logging, "trace", "auth", "Acceso autenticado", { method: req.method, path: req.path, userId: session.user.id });
+      log(authCore.logging, "trace", "auth", "Acceso autenticado", { method: req.method, path: req.baseUrl, userId: session.user.id });
       return next();
     } catch (error) {
-      log(authCore.logging, "error", "auth", "Error de autenticación", { method: req.method, path: req.path, error: error.message, status: error.status ?? 500 });
+      log(authCore.logging, "error", "auth", "Error de autenticación", { method: req.method, path: req.baseUrl, error: error.message, status: error.status ?? 500 });
       if (!(Number(error?.status ?? 500) < 500)) return next(error);
       return sendError(res, error, shouldChallenge(error, req));
     }
@@ -81,7 +81,7 @@ async function handleLogin(req, res, next, { authCore, jwt, options }) {
 
     return sendData(res, { ...publicValue, token, expiresIn });
   } catch (error) {
-    log(authCore.logging, "error", "auth", "Error de inicio de sesión", { method: req.method, path: req.path, error: error.message, status: error.status ?? 500 });
+    log(authCore.logging, "error", "auth", "Error de inicio de sesión", { method: req.method, path: req.baseUrl, error: error.message, status: error.status ?? 500 });
     if (!shouldSendError(error)) return next(error);
     return sendLoginError(res, error, req);
   }

@@ -15,7 +15,7 @@ async function request(adapter, method, path, body, token, options = {}) {
     setHeader() {}
   };
   await auth({ adapter, jwt: { secret }, logging: false, ...options })(
-    { method, path, body, headers: token ? { authorization: `Bearer ${token}` } : {} },
+    { method, path, url: path, baseUrl: "/iam", body, headers: token ? { authorization: `Bearer ${token}` } : {} },
     res, error => { if (error) throw error; res.next = true; }
   );
   return res;

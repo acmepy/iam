@@ -2,6 +2,8 @@
 
 Estados: [] pendiente, [X] completado.
 
+- [X] Corregir la detección de endpoints para usar la ruta de la petición en lugar del punto de montaje del router; verificados los tests de cuentas con baseUrl /iam, la suite completa y el build.
+
 - [X] Eliminar logging.test.js y verificar la suite restante, conservando las pruebas de integración de logging en Express; 46 pruebas correctas.
 
 - [X] Corregir llamadas y pruebas para conservar el formato de log [IAM], operación, txId, mensaje y detalles; 49 pruebas y build correctos.

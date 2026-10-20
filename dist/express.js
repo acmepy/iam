@@ -195,6 +195,7 @@ function normalizeLogging(logging) {
     trace: logging.trace ?? defaults.trace,
     warn: logging.warn ?? defaults.warn,
     error: logging.error ?? defaults.error,
+    getContext: logging.getContext,
     target: logging
   };
 }
@@ -202,7 +203,9 @@ function normalizeLogging(logging) {
 function log(logging, level, message, details) {
   const logger = logging?.[levels.has(level) ? level : "info"];
   if (typeof logger !== "function") return;
-  logger.call(logging.target ?? logging, "[IAM]", message, redact(details));
+  const txId = logging.getContext?.call(logging.target ?? logging)?.txId;
+  const values = txId == null ? details : { ...details, txId };
+  logger.call(logging.target ?? logging, "[IAM]", message, redact(values));
 }
 
 function redact(details) {

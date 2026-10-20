@@ -2,6 +2,8 @@
 
 Estados: [] pendiente, [X] completado.
 
+- [X] Agregar txId a los logs cuando exista en el contexto provisto por logging.getContext; verificado con pruebas de aislamiento concurrente y ausencia de contexto.
+
 - [X] Establecer expiresIn JWT por defecto en 365 dias y verificar el vencimiento emitido.
 - [X] Cerrar exclusivamente la sesion del token Bearer mediante POST /logout sin cuerpo; actualizar cliente y pruebas.
 

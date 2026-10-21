@@ -897,7 +897,7 @@ class SeqAdapter {
     const rolesPermissions = await this.models.rolesPermissions.findAll({
       where: {active: true},
       attributes: ["permissionId"],
-      //eager: false,
+      eager: true,
       include: [
         {model: this.models.permissions, as: "permission", where, required: true},
         {

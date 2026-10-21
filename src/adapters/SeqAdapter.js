@@ -130,7 +130,13 @@ export class SeqAdapter {
       attributes: ["permissionId"],
       eager: true,
       include: [
-        {model: this.models.permissions, as: "permission", where, required: true},
+        {
+          model: this.models.permissions, 
+          as: "permission", 
+          where, 
+          attributes: ["id", "permission"],
+          required: true
+        },
         {
           model: this.models.roles,
           as: "role",

@@ -2,6 +2,8 @@
 
 Estados: [] pendiente, [X] completado.
 
+- [X] Conservar el id del permiso en el include eager para evitar eliminar permisos distintos al deduplicar; test específico, 46 pruebas y build correctos.
+
 - [X] Corregir la detección de endpoints para usar la ruta de la petición en lugar del punto de montaje del router; verificados los tests de cuentas con baseUrl /iam, la suite completa y el build.
 
 - [X] Eliminar logging.test.js y verificar la suite restante, conservando las pruebas de integración de logging en Express; 46 pruebas correctas.

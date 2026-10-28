@@ -9,6 +9,7 @@ export function publicUser(user) {
 
   return {
     id: user.id,
+    ...(user.tenantId !== undefined && { tenantId: user.tenantId }),
     name: user.name,
     email: user.email,
     options: user.options ?? {}
@@ -18,6 +19,7 @@ export function publicUser(user) {
 export function publicSession(session, user, extras = {}) {
   return {
     id: session.id,
+    ...(session.tenantId !== undefined && { tenantId: session.tenantId }),
     user: publicUser(user),
     options: session.options ?? {},
     ...extras

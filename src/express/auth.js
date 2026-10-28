@@ -15,6 +15,8 @@ import { setContext } from "./context.js";
 import { log, normalizeLogging } from "./logging.js";
 import { register, updateProfile, changePassword, resetPassword } from "./accounts.js";
 
+import { assertTenantAccess, requireTenant, requireMethods, setTenantContext, updateOwnSettings } from "./tenants.js";
+
 const basicRealm = "IAM";
 const defaultExpiresIn = 365 * 24 * 60 * 60;
 
@@ -28,9 +30,12 @@ export function auth(options = {}) {
   const { adapter } = options;
   if (!adapter) throw new AdapterError();
 
+  if (options.tenant !== undefined && typeof options.tenant !== "boolean") throw new ValidationError("tenant debe ser booleano");
+  if (options.tenant && options.createSession === false) throw new ValidationError("tenant requiere sesiones persistidas");
+  if (options.tenant) requireMethods(adapter, "findTenantById", "findTenantsByUserId");
   const jwt = resolveJwtConfig(options);
   const rbac = new RBAC({ adapter });
-  const authCore = { adapter, rbac, getContext: options.getContext, logging: normalizeLogging(options.logging, options.getContext) };
+  const authCore = { adapter, rbac, tenant: options.tenant === true, getContext: options.getContext, logging: normalizeLogging(options.logging, options.getContext) };
 
   return async function iamAuth(req, res, next) {
     try {
@@ -51,6 +56,20 @@ export function auth(options = {}) {
       if (matches(req, "POST", "/logout")) return await handleLogout(req, res, { authCore, jwt, options, rbac });
       const session = await authenticateRequest(req, { authCore, jwt, options });
       attach(req, { authCore, rbac, session });
+      if (matches(req, "GET", "/me/tenants")) {
+        requireTenant(authCore.tenant);
+        const tenants = await adapter.findTenantsByUserId(session.user.id);
+        return sendData(res, tenants.map(({ id, name }) => ({ id, name })));
+      }
+      for (const [path, scope, field] of [["/me/options", "user", "options"], ["/session/options", "session", "options"],
+        ["/me/tenant", "user", "tenantId"], ["/session/tenant", "session", "tenantId"]]) {
+        if (!matches(req, "PATCH", path)) continue;
+        const updated = await updateOwnSettings(adapter, session, req.body, { tenant: authCore.tenant, scope, field });
+        if (scope === "user") return sendData(res, updated);
+        const nextSession = await createPublicSession(authCore, updated, session.user);
+        attach(req, { authCore, rbac, session: nextSession });
+        return sendData(res, nextSession);
+      }
       if (matches(req, "PATCH", "/me")) return sendData(res, await updateProfile(adapter, session.user.id, req.body));
       if (matches(req, "POST", "/me/password")) {
         await changePassword(adapter, session.user.id, req.body);
@@ -72,7 +91,7 @@ async function handleLogin(req, res, next, { authCore, jwt, options }) {
     if (!credentials) throw new AuthRequiredError();
 
     const user = await validateCredentials(authCore.adapter, credentials.username, credentials.password);
-    const session = await createSession(authCore.adapter, user.id, sessionOptions(user, credentials.options), options);
+    const session = await createSession(authCore.adapter, user, sessionOptions(user, credentials.options), options);
     const publicValue = await createPublicSession(authCore, session, user);
     const expiresIn = normalizeExpiresIn(jwt.expiresIn);
     const token = await signJwt({ sessionId: session.id }, jwt.secret, { expiresIn });
@@ -123,7 +142,7 @@ async function authenticateJwt(header, authCore, jwt) {
 async function authenticateBasic(header, authCore, options) {
   const credentials = credentialsFromBasicValue(header.slice("Basic ".length).trim());
   const user = await validateCredentials(authCore.adapter, credentials.username, credentials.password);
-  const session = await createOrReuseSession(authCore.adapter, user.id, sessionOptions(user), options);
+  const session = await createOrReuseSession(authCore.adapter, user, sessionOptions(user), options);
   return createPublicSession(authCore, session, user);
 }
 
@@ -186,20 +205,25 @@ async function validateCredentials(adapter, username, password) {
   return user;
 }
 
-async function createOrReuseSession(adapter, userId, options, authOptions) {
+async function createOrReuseSession(adapter, user, options, authOptions) {
+  const userId = user.id;
   if (authOptions.createSession === false) return {id: null, userId, options, active: true};
   if (typeof adapter.findActiveSessionByUserId === "function") {
     const activeSession = await adapter.findActiveSessionByUserId(userId);
     if (activeSession) return activeSession;
   }
-  const date = now();
-  return adapter.createSession({id: createSessionId(), userId, token: null, options, active: true, createdAt: date, updatedAt: date});
+  return createSession(adapter, user, options, authOptions);
 }
 
-async function createSession(adapter, userId, options, authOptions) {
+async function createSession(adapter, user, options, authOptions) {
+  const userId = user.id;
+  if (authOptions.tenant) {
+    await assertTenantAccess(adapter, userId, user.tenantId);
+    setTenantContext(authOptions.getContext, user.tenantId);
+  }
   if (authOptions.createSession === false) return {id: null, userId, options, active: true};
   const date = now();
-  return adapter.createSession({id: createSessionId(), userId, token: null, options, active: true, createdAt: date, updatedAt: date});
+  return adapter.createSession({id: createSessionId(), userId, ...(authOptions.tenant && { tenantId: user.tenantId }), token: null, options, active: true, createdAt: date, updatedAt: date});
 }
 
 async function getActivePublicSession(authCore, sessionId) {
@@ -213,6 +237,7 @@ async function getActivePublicSession(authCore, sessionId) {
 }
 
 async function createPublicSession(authCore, session, user) {
+  if (authCore.tenant) await assertTenantAccess(authCore.adapter, user.id, session.tenantId);
   const permissions = await authCore.rbac.getPermissions(user.id);
   return publicSession(session, user, {
     permissions: Array.from(new Set(
@@ -223,6 +248,7 @@ async function createPublicSession(authCore, session, user) {
 
 function attach(req, { authCore, rbac, session }) {
   req.session = session;
+  if (authCore.tenant) setTenantContext(authCore.getContext, session.tenantId);
   setContext(req, { auth: authCore, adapter: authCore.adapter, rbac, session });
 }
 
@@ -323,7 +349,7 @@ function sendData(res, data) {
 }
 
 function errorResponse(error, message) {
-  return {ok: false, message, stack: error.stack};
+  return {ok: false, code: error.code, message, stack: error.stack};
 }
 
 function shouldSendError(error) {

@@ -31,3 +31,24 @@ test("published package generates a reset link consumed by its middleware", asyn
   await middleware(req, res, error => { if (error) throw error; });
   assert.equal(res.statusCode, 401);
 });
+
+test("published tenant middleware validates and persists the current session selection", async () => {
+  const { MemoryAdapter } = await import("iam/adapters");
+  const { auth } = await import("iam/express");
+  const adapter = new MemoryAdapter({
+    users: [{ id: "user", password: "old", tenantId: 1, active: true }],
+    tenants: [{ id: 1, name: "One", active: true }, { id: 2, name: "Two", active: true }],
+    usersTenants: [{ userId: "user", tenantId: 1, active: true }, { userId: "user", tenantId: 2, active: true }],
+  });
+  const middleware = auth({ adapter, tenant: true, logging: false, jwt: { secret: "test-secret" } });
+  const res = { statusCode: 200, json(body) { this.body = body; return this; }, status(value) { this.statusCode = value; return this; } };
+  const next = error => { if (error) throw error; };
+  await middleware({ method: "POST", path: "/login", body: { username: "user", password: "old" }, headers: {} }, res, next);
+  assert.equal(res.body.data.tenantId, 1);
+  const session = res.body.data;
+  await middleware({ method: "PATCH", path: "/session/tenant", body: { tenantId: 2 }, headers: { authorization: `Bearer ${session.token}` } }, res, next);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.data.tenantId, 2);
+  assert.equal((await adapter.findSessionById(session.id)).tenantId, 2);
+  assert.equal((await adapter.findUserById("user")).tenantId, 1);
+});

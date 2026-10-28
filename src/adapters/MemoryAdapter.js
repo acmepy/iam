@@ -1,6 +1,6 @@
 import { now } from "../core/utils.js";
 
-const collections = ["users", "roles", "permissions", "usersRoles", "rolesPermissions", "sessions", "passwordResets"];
+const collections = ["users", "roles", "permissions", "usersRoles", "rolesPermissions", "sessions", "passwordResets", "tenants", "usersTenants"];
 
 /**
  * In-memory IAM adapter, useful for tests, demos, and small embedded setups.
@@ -11,6 +11,15 @@ export class MemoryAdapter {
    */
   constructor(data = {}) {
     for (const name of collections) this[name] = [...(data[name] ?? [])];
+  }
+
+  async findTenantById(id) {
+    return this.tenants.find(tenant => tenant.id === id) ?? null;
+  }
+
+  async findTenantsByUserId(userId) {
+    const ids = new Set(this.usersTenants.filter(item => item.userId === userId && item.active !== false).map(item => item.tenantId));
+    return this.tenants.filter(item => ids.has(item.id) && item.active !== false);
   }
 
   async findUserByUsername(username) {

@@ -10,12 +10,16 @@ import type {
   RolePermissionData,
   SessionData,
   UserData,
-  UserRoleData
+  UserRoleData,
+  TenantData,
+  UserTenantData
 } from "./types.js";
 
 export class MemoryAdapter implements Adapter {
   constructor(data?: AdapterData);
   users: UserData[];
+  tenants: TenantData[];
+  usersTenants: UserTenantData[];
   roles: RoleData[];
   permissions: PermissionData[];
   usersRoles: UserRoleData[];
@@ -23,10 +27,12 @@ export class MemoryAdapter implements Adapter {
   sessions: SessionData[];
   passwordResets: PasswordResetData[];
   createUser(user: UserData): Promise<UserData>;
-  updateUser(id: Id, values: Partial<Pick<UserData, "name" | "email">>): Promise<UserData | null>;
+  updateUser(id: Id, values: Partial<Pick<UserData, "name" | "email" | "options" | "tenantId">>): Promise<UserData | null>;
   createPasswordReset(reset: PasswordResetData): Promise<void>;
   changePassword(userId: Id, expectedPassword: string | undefined, password: string): Promise<boolean>;
   resetPassword(id: string, password: string, timestamp: number): Promise<boolean>;
+  findTenantById(id: Id): Promise<TenantData | null>;
+  findTenantsByUserId(userId: Id): Promise<TenantData[]>;
   findUserByUsername(username: string): Promise<UserData | null>;
   findUserById(id: Id): Promise<UserData | null>;
   verifyPassword(user: UserData, password: string): Promise<boolean>;
@@ -65,14 +71,16 @@ export class IndexedDBAdapter extends MemoryAdapter {
 }
 
 export class SequelizeAdapter implements Adapter {
-  constructor(options?: { sequelize?: unknown; models?: Record<string, unknown>; tableNames?: Record<string, string> });
+  constructor(options?: { sequelize?: unknown; models?: Record<string, unknown>; tableNames?: Record<string, string>; tenant?: boolean });
   sequelize?: unknown;
   models: Record<string, unknown>;
   createUser(user: UserData): Promise<UserData>;
-  updateUser(id: Id, values: Partial<Pick<UserData, "name" | "email">>): Promise<UserData | null>;
+  updateUser(id: Id, values: Partial<Pick<UserData, "name" | "email" | "options" | "tenantId">>): Promise<UserData | null>;
   createPasswordReset(reset: PasswordResetData): Promise<void>;
   changePassword(userId: Id, expectedPassword: string | undefined, password: string): Promise<boolean>;
   resetPassword(id: string, password: string, timestamp: number): Promise<boolean>;
+  findTenantById(id: Id): Promise<TenantData | null>;
+  findTenantsByUserId(userId: Id): Promise<TenantData[]>;
   findUserByUsername(username: string): Promise<UserData | null>;
   findUserById(id: Id): Promise<UserData | null>;
   verifyPassword(user: UserData, password: string): Promise<boolean>;
@@ -88,6 +96,6 @@ export class SequelizeAdapter implements Adapter {
 }
 
 export class SeqAdapter extends SequelizeAdapter {
-  constructor(options?: { seq?: unknown; models?: Record<string, unknown>; tableNames?: Record<string, string>; auditable?: Auditable });
+  constructor(options?: { seq?: unknown; models?: Record<string, unknown>; tableNames?: Record<string, string>; tenant?: boolean; auditable?: Auditable });
   seq?: unknown;
 }

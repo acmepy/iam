@@ -182,7 +182,7 @@ class RolePermission {
   }
 }
 
-const collections$1 = ["users", "roles", "permissions", "usersRoles", "rolesPermissions", "sessions", "passwordResets"];
+const collections$1 = ["users", "roles", "permissions", "usersRoles", "rolesPermissions", "sessions", "passwordResets", "tenants", "usersTenants"];
 
 /**
  * In-memory IAM adapter, useful for tests, demos, and small embedded setups.
@@ -193,6 +193,15 @@ class MemoryAdapter {
    */
   constructor(data = {}) {
     for (const name of collections$1) this[name] = [...(data[name] ?? [])];
+  }
+
+  async findTenantById(id) {
+    return this.tenants.find(tenant => tenant.id === id) ?? null;
+  }
+
+  async findTenantsByUserId(userId) {
+    const ids = new Set(this.usersTenants.filter(item => item.userId === userId && item.active !== false).map(item => item.tenantId));
+    return this.tenants.filter(item => ids.has(item.id) && item.active !== false);
   }
 
   async findUserByUsername(username) {
@@ -353,7 +362,7 @@ class LocalStorageAdapter extends MemoryAdapter {
 
   save() {
     if (!this.storage) throw new AdapterError("localStorage no está disponible");
-    this.storage.setItem(this.key, JSON.stringify({users: this.users, roles: this.roles, permissions: this.permissions, usersRoles: this.usersRoles, rolesPermissions: this.rolesPermissions, sessions: this.sessions, passwordResets: this.passwordResets}));
+    this.storage.setItem(this.key, JSON.stringify({users: this.users, roles: this.roles, permissions: this.permissions, usersRoles: this.usersRoles, rolesPermissions: this.rolesPermissions, sessions: this.sessions, passwordResets: this.passwordResets, tenants: this.tenants, usersTenants: this.usersTenants}));
   }
 }
 
@@ -363,7 +372,7 @@ function load(storage, key) {
   return value ? JSON.parse(value) : null;
 }
 
-const collections = ["users", "roles", "permissions", "usersRoles", "rolesPermissions", "sessions", "passwordResets"];
+const collections = ["users", "roles", "permissions", "usersRoles", "rolesPermissions", "sessions", "passwordResets", "tenants", "usersTenants"];
 const defaultDbName = "iam";
 const defaultStoreName = "collections";
 
@@ -482,11 +491,15 @@ function transactionToPromise(transaction) {
   });
 }
 
-function defineIamModels({ define, DataTypes, tableNames = {}, references = false, associations = false }) {
+function defineIamModels({ define, DataTypes, tableNames = {}, references = false, associations = false, tenant = false }) {
   const models = Object.fromEntries(
-    modelDefinitions.map((definition) => {
+    [...(tenant ? tenantDefinitions : []), ...modelDefinitions].map((definition) => {
       const tableName = tableNames[definition.name] ?? definition.tableName;
-      return [ definition.name, define(definition.name, mapAttributes(definition.attributes, DataTypes, references), { tableName, timestamps: true})];
+      const attributes = { ...definition.attributes };
+      if (tenant && ["users", "sessions"].includes(definition.name)) {
+        attributes.tenantId = { type: "integer", allowNull: true, references: { model: "tenants", key: "id" } };
+      }
+      return [ definition.name, define(definition.name, mapAttributes(attributes, DataTypes, references), { tableName, timestamps: true, tenant: false })];
     })
   );
 
@@ -515,7 +528,28 @@ function associateIamModels(models) {
   models.rolesPermissions.belongsTo(models.permissions, { foreignKey: "permissionId", as: "permission" });
 
   models.sessions.belongsTo(models.users, { foreignKey: "userId", as: "user" });
+  if (models.tenants && models.usersTenants) {
+    models.users.belongsTo(models.tenants, { foreignKey: "tenantId", as: "tenant" });
+    models.sessions.belongsTo(models.tenants, { foreignKey: "tenantId", as: "tenant" });
+    models.users.hasMany(models.usersTenants, { foreignKey: "userId", as: "usersTenants" });
+    models.tenants.hasMany(models.usersTenants, { foreignKey: "tenantId", as: "usersTenants" });
+    models.usersTenants.belongsTo(models.users, { foreignKey: "userId", as: "user" });
+    models.usersTenants.belongsTo(models.tenants, { foreignKey: "tenantId", as: "tenant" });
+  }
 }
+
+const tenantDefinitions = [
+  { name: "tenants", attributes: {
+    id: { type: "integer", primaryKey: true, autoIncrement: true },
+    name: { type: "string", length: 150, allowNull: false },
+    active: { type: "boolean", allowNull: false, defaultValue: true }
+  } },
+  { name: "usersTenants", attributes: {
+    userId: { type: "string", length: 100, primaryKey: true, allowNull: false, references: { model: "users", key: "id" } },
+    tenantId: { type: "integer", primaryKey: true, allowNull: false, references: { model: "tenants", key: "id" } },
+    active: { type: "boolean", allowNull: false, defaultValue: true }
+  } }
+];
 
 const modelDefinitions = [
   {
@@ -603,10 +637,22 @@ function mapType(type, length, DataTypes) {
 }
 
 class SequelizeAdapter {
-  constructor({ sequelize, models, tableNames } = {}) {
+  constructor({ sequelize, models, tableNames, tenant = false } = {}) {
     if (!sequelize && !models) throw new AdapterError("Sequelize o models son requeridos");
     this.sequelize = sequelize;
-    this.models = models ?? defineIamModels({define: sequelize.define.bind(sequelize), DataTypes: sequelize.Sequelize.DataTypes, tableNames, associations: true});
+    this.models = models ?? defineIamModels({define: sequelize.define.bind(sequelize), DataTypes: sequelize.Sequelize.DataTypes, tableNames, associations: true, tenant});
+  }
+
+  async findTenantById(id) {
+    if (!this.models.tenants) throw new AdapterError("Modelo tenants requerido: habilite tenant en SequelizeAdapter");
+    return normalize(await this.models.tenants.findByPk(id));
+  }
+
+  async findTenantsByUserId(userId) {
+    if (!this.models.usersTenants) throw new AdapterError("Modelo usersTenants requerido");
+    const assignments = await this.models.usersTenants.findAll({ where: { userId, active: true } });
+    const tenants = await Promise.all(assignments.map(item => this.findTenantById(readValue(item, "tenantId"))));
+    return tenants.filter(item => item && item.active !== false);
   }
 
   async findUserByUsername(username) {
@@ -773,11 +819,23 @@ function uniqueNormalized$1(models) {
 }
 
 class SeqAdapter {
-  constructor({ seq, models, tableNames, auditable } = {}) {
+  constructor({ seq, models, tableNames, auditable, tenant = false } = {}) {
     if (!seq && !models) throw new AdapterError("Seq o models son requeridos");
     this.seq = seq;
-    this.models = models ?? defineIamModels({define: seq.define.bind(seq), DataTypes, tableNames, references: true, associations: true});
+    this.models = models ?? defineIamModels({define: seq.define.bind(seq), DataTypes, tableNames, references: true, associations: true, tenant});
     this.auditable = normalizeAuditable(auditable);
+  }
+
+  async findTenantById(id) {
+    if (!this.models.tenants) throw new AdapterError("Modelo tenants requerido: habilite tenant en SeqAdapter");
+    return (await this.models.tenants.findByPk(id))?.get() ?? null;
+  }
+
+  async findTenantsByUserId(userId) {
+    if (!this.models.usersTenants) throw new AdapterError("Modelo usersTenants requerido");
+    const assignments = await this.models.usersTenants.findAll({ where: { userId, active: true } });
+    const tenants = await Promise.all(assignments.map(item => this.findTenantById(item.getDataValue("tenantId"))));
+    return tenants.filter(item => item && item.active !== false);
   }
 
   async findUserByUsername(username) {

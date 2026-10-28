@@ -59,6 +59,38 @@ const auth = {
     return user;
   },
 
+  async updateUserOptions(options) {
+    const user = await request("/me/options", { method: "PATCH", headers: sessionHeaders(), body: JSON.stringify({ options }) });
+    current = { ...current, user };
+    save(defaultState, current);
+    return user;
+  },
+
+  async updateSessionOptions(options) {
+    const session = await request("/session/options", { method: "PATCH", headers: sessionHeaders(), body: JSON.stringify({ options }) });
+    current = { ...current, ...session };
+    save(defaultState, current);
+    return current;
+  },
+
+  async setUserTenant(tenantId) {
+    const user = await request("/me/tenant", { method: "PATCH", headers: sessionHeaders(), body: JSON.stringify({ tenantId }) });
+    current = { ...current, user };
+    save(defaultState, current);
+    return user;
+  },
+
+  async setSessionTenant(tenantId) {
+    const session = await request("/session/tenant", { method: "PATCH", headers: sessionHeaders(), body: JSON.stringify({ tenantId }) });
+    current = { ...current, ...session };
+    save(defaultState, current);
+    return current;
+  },
+
+  async getTenants() {
+    return request("/me/tenants", { headers: sessionHeaders() });
+  },
+
   async changePassword(currentPassword, password) {
     await request("/me/password", { method: "POST", headers: sessionHeaders(), body: JSON.stringify({ currentPassword, password }) });
     current = null;
@@ -124,11 +156,10 @@ async function request(path, init = {}) {
     }
   });
 
-  if (!response.ok) {
-    throw new RbacError(`Solicitud fallida con estado ${response.status}`, response.status);
-  }
-
   const result = await response.json();
+  if (!response.ok) {
+    throw new RbacError(result.message || `Solicitud fallida con estado ${response.status}`, response.status, result.code, result.errors);
+  }
   return result.data;
 }
 

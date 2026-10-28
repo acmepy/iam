@@ -36,6 +36,70 @@ const rbac = new RBAC({ adapter });
 console.log(await rbac.can("admin", "users.list")); // true
 ```
 
+## Tenants opcionales
+
+Habilita el catalogo y sus columnas con `new SeqAdapter({ seq, tenant: true })` (o `SequelizeAdapter({ sequelize, tenant: true })`) y la validacion HTTP con `auth({ adapter, tenant: true, jwt: { secret }, getContext })`. Sin esas opciones IAM conserva el funcionamiento anterior y los modelos SQL no incorporan las tablas ni columnas de tenant.
+
+Los modelos de IAM son globales (`tenant: false`), incluso cuando comparten una instancia de Seq con modelos de negocio protegidos. La configuracion genera:
+
+- `tenants`: `id` entero autoincremental, `name` y `active`.
+- `usersTenants`: clave compuesta `userId` / `tenantId`, referencias a usuario y tenant, y `active`.
+- `users.tenantId`: tenant predeterminado.
+- `sessions.tenantId`: tenant activo de esa sesion, copiado del usuario al iniciar sesion.
+
+El tenant se obtiene exclusivamente de la sesion persistida, nunca de headers, del cuerpo de login ni de `options`. Al iniciar sesion y en cada peticion se comprueba que existe, esta activo y tiene una asignacion activa para ese usuario. Cambiar el predeterminado no modifica sesiones abiertas. Cambiar una sesion no modifica otras sesiones ni el predeterminado. El JWT identifica la sesion; un cambio se refleja al consultar de nuevo su registro, sin emitir otro token.
+
+Durante el login, el tenant predeterminado validado tambien se coloca en el contexto antes de persistir la sesion; asi los callbacks `auditable` del adaptador pueden escribir en modelos de auditoria protegidos por Seq.
+
+Los identificadores no se convierten: `2` y `"2"` son distintos; `0` es valido. Los modelos generados usan enteros. Para modelos personalizados se puede conservar otro tipo de identificador, pero todos los modelos y el contexto de Seq deben compartir su tipo. Los adaptadores personalizados necesitan `findTenantById(id)` y `findTenantsByUserId(userId)`; este ultimo devuelve solo tenants activos con asignaciones activas. Las operaciones de opciones requieren `updateUser` y `updateSession`.
+
+Estas rutas pertenecen al usuario y a la sesion autenticados:
+
+| Ruta | Cuerpo | Resultado |
+| --- | --- | --- |
+| `GET /me/tenants` | Ninguno | Solo `{ id, name }` de los tenants accesibles. |
+| `PATCH /me/tenant` | `{ tenantId }` | Cambia el predeterminado y devuelve el usuario publico. |
+| `PATCH /session/tenant` | `{ tenantId }` | Cambia el activo y devuelve la sesion publica. |
+| `PATCH /me/options` | `{ options: { ... } }` | Combina preferencias con las del usuario y devuelve el usuario publico. |
+| `PATCH /session/options` | `{ options: { ... } }` | Combina preferencias con las de la sesion y devuelve la sesion publica. |
+
+Las rutas de opciones funcionan tambien sin habilitar tenants. Rechazan otros campos del cuerpo, `tenantId` dentro de las opciones y claves de prototipo. No cambian roles, permisos ni la identidad autenticada. El cambio de tenant debe usar su ruta especifica. La seleccion de tenant requiere sesiones persistidas; `tenant: true` con `createSession: false` es invalido.
+
+Los errores incluyen `code` y `message`: `TENANT_REQUIRED` (403, falta tenant en usuario o sesion), `TENANT_UNAVAILABLE` (403, inexistente o inactivo), `TENANT_FORBIDDEN` (403, no asignado), `TENANT_INVALID` (400) y `TENANT_DISABLED` (400). Una asignacion revocada bloquea tambien los tokens previamente emitidos en su siguiente peticion.
+
+Para integrar con el contexto de Seq, `getContext` debe devolver el objeto mutable de la peticion actual. IAM establece alli `tenantId` despues de autenticar y validar la sesion; conserva los demas campos, incluido `txId`. Si se proporciona el callback pero no devuelve un contexto, la peticion falla con `TENANT_CONTEXT_MISSING` (403). Sin callback, la aplicacion puede consumir `req.session.tenantId` directamente. Ejemplo con Express y SQLite:
+
+```js
+import { AsyncLocalStorage } from "node:async_hooks";
+import express from "express";
+import { Seq, SQLiteAdapter } from "seq";
+import { SeqAdapter } from "iam/adapters";
+import { auth } from "iam/express";
+
+const storage = new AsyncLocalStorage();
+const getContext = () => storage.getStore();
+const seq = new Seq({
+  adapter: new SQLiteAdapter({ database: ":memory:" }),
+  getContext,
+  tenant: { attribute: "codEmpresa" },
+  logging: false,
+});
+const adapter = new SeqAdapter({ seq, tenant: true });
+await seq.init();
+await seq.sync();
+
+const app = express();
+app.use(express.json());
+app.use((_req, _res, next) => storage.run({}, next));
+app.use("/iam", auth({ adapter, tenant: true, getContext, jwt: { secret: process.env.JWT_SECRET } }));
+```
+
+El codigo administrativo de la aplicacion crea los tenants, las asignaciones y el tenant predeterminado antes del login, por ejemplo mediante `adapter.models.tenants`, `adapter.models.usersTenants` y `adapter.updateUser`. IAM no publica rutas para otorgarse acceso. Con `MemoryAdapter`, esas colecciones se reciben en `data`; LocalStorage e IndexedDB tambien las conservan. Para bases existentes hay que migrar las tablas y columnas y asignar los valores de usuario; `sync()` sin migracion no agrega automaticamente columnas a tablas existentes.
+
+El cliente de navegador expone `auth.getTenants()`, `auth.setUserTenant(tenantId)`, `auth.setSessionTenant(tenantId)`, `auth.updateUserOptions(options)` y `auth.updateSessionOptions(options)`. Actualizan su estado publico persistido y conservan el token. Las caches de negocio, los pendientes y las conexiones SSE pertenecen a la aplicacion: estos metodos no los vacian ni los sincronizan.
+
+Verificado con MemoryAdapter, LocalStorage, SQLite real y peticiones HTTP concurrentes con Seq 1.4.1.
+
 ## Registro, perfil y recuperacion de contrasena
 
 Habilita el registro expresamente con `auth({ adapter, registration: true, jwt: { secret } })`.

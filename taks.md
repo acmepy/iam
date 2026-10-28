@@ -27,4 +27,6 @@ Estados: [] pendiente, [X] completado.
 - [X] Generar el enlace de restablecimiento con URL configurada por el servidor, sin enviar notificaciones.
 - [X] Implementar restablecimiento de contraseña mediante credencial válida, consumirla e invalidar las sesiones existentes sin reactivar cuentas desactivadas.
 - [X] Incorporar registro, perfil, cambio y restablecimiento al cliente de navegador y verificar su integración con el middleware.
+- [X] Implementar tenants opcionales: catalogo tenants, usersTenants, tenantId en usuarios y sesiones, opciones propias y cambio separado de tenant. Verificados revocacion, contexto ausente, auditoria de login, concurrencia, aislamiento HTTP con Seq 1.4.1, cliente de navegador, exports compilados, 68 pruebas y build.
+
 - [] Integrar en la aplicación o en un proyecto externo el envío del link de restablecimiento, previa verificación de identidad; IAM no enviará correos, SMS ni WhatsApp.

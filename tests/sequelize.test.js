@@ -2,6 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { SequelizeAdapter } from "../src/adapters/index.js";
 
+test("SequelizeAdapter reads tenants and active memberships using its native models", async () => {
+  const adapter = new SequelizeAdapter({ models: {
+    tenants: { async findByPk(id) { return { get: () => ({ id, name: `Tenant ${id}`, active: id !== 2 }) }; } },
+    usersTenants: { async findAll(options) {
+      assert.deepEqual(options, { where: { userId: "one", active: true } });
+      return [1, 2].map(tenantId => ({ get: () => ({ userId: "one", tenantId }) }));
+    } },
+  } });
+  assert.deepEqual(await adapter.findTenantById(1), { id: 1, name: "Tenant 1", active: true });
+  assert.deepEqual(await adapter.findTenantsByUserId("one"), [{ id: 1, name: "Tenant 1", active: true }]);
+});
+
 test("SequelizeAdapter filters permissions with include", async () => {
   const calls = [];
   const adapter = new SequelizeAdapter({

@@ -4,11 +4,23 @@ import { createSessionId, now } from "../core/utils.js";
 import { defineIamModels } from "./models/iamModels.js";
 
 export class SeqAdapter {
-  constructor({ seq, models, tableNames, auditable } = {}) {
+  constructor({ seq, models, tableNames, auditable, tenant = false } = {}) {
     if (!seq && !models) throw new AdapterError("Seq o models son requeridos");
     this.seq = seq;
-    this.models = models ?? defineIamModels({define: seq.define.bind(seq), DataTypes, tableNames, references: true, associations: true});
+    this.models = models ?? defineIamModels({define: seq.define.bind(seq), DataTypes, tableNames, references: true, associations: true, tenant});
     this.auditable = normalizeAuditable(auditable);
+  }
+
+  async findTenantById(id) {
+    if (!this.models.tenants) throw new AdapterError("Modelo tenants requerido: habilite tenant en SeqAdapter");
+    return (await this.models.tenants.findByPk(id))?.get() ?? null;
+  }
+
+  async findTenantsByUserId(userId) {
+    if (!this.models.usersTenants) throw new AdapterError("Modelo usersTenants requerido");
+    const assignments = await this.models.usersTenants.findAll({ where: { userId, active: true } });
+    const tenants = await Promise.all(assignments.map(item => this.findTenantById(item.getDataValue("tenantId"))));
+    return tenants.filter(item => item && item.active !== false);
   }
 
   async findUserByUsername(username) {

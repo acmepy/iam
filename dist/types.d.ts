@@ -26,6 +26,8 @@ export type Logging = boolean | {
 export interface ExpressAuthOptions {
   adapter: Adapter;
   registration?: boolean;
+  /** Enables authenticated tenant selection and validation. Requires persisted sessions. */
+  tenant?: boolean;
   jwt?: {
     secret: string;
     expiresIn?: number | string;
@@ -34,7 +36,7 @@ export interface ExpressAuthOptions {
   strategies?: AuthStrategy[];
   createSession?: boolean;
   logging?: Logging;
-  getContext?: () => (Dict & { txId?: string | number | null }) | null | undefined;
+  getContext?: () => (Dict & { txId?: string | number | null; tenantId?: Id | null }) | null | undefined;
 }
 
 export interface BrowserAuthOptions {
@@ -51,6 +53,7 @@ export interface BrowserCredentials {
 }
 
 export interface UserData {
+  tenantId?: Id | null;
   id: Id;
   password?: string;
   name?: string;
@@ -91,6 +94,7 @@ export interface RolePermissionData {
 }
 
 export interface SessionData {
+  tenantId?: Id | null;
   id: Id | null;
   userId: Id;
   token?: string | null;
@@ -102,6 +106,7 @@ export interface SessionData {
 }
 
 export interface PublicUser {
+  tenantId?: Id | null;
   id: Id;
   name?: string;
   email?: string;
@@ -110,6 +115,7 @@ export interface PublicUser {
 }
 
 export interface PublicSession {
+  tenantId?: Id | null;
   id: Id | null;
   user: PublicUser;
   token?: string | null;
@@ -118,9 +124,23 @@ export interface PublicSession {
   [key: string]: unknown;
 }
 
+export interface TenantData {
+  id: Id;
+  name: string;
+  active?: boolean;
+}
+
+export interface UserTenantData {
+  userId: Id;
+  tenantId: Id;
+  active?: boolean;
+}
+
 export interface Adapter {
+  findTenantById?(id: Id): Promise<TenantData | null>;
+  findTenantsByUserId?(userId: Id): Promise<TenantData[]>;
   createUser?(user: UserData): Promise<UserData>;
-  updateUser?(id: Id, values: Partial<Pick<UserData, "name" | "email">>): Promise<UserData | null>;
+  updateUser?(id: Id, values: Partial<Pick<UserData, "name" | "email" | "options" | "tenantId">>): Promise<UserData | null>;
   createPasswordReset?(reset: PasswordResetData): Promise<void>;
   changePassword?(userId: Id, expectedPassword: string | undefined, password: string): Promise<boolean>;
   resetPassword?(id: string, password: string, timestamp: number): Promise<boolean>;
@@ -138,6 +158,8 @@ export interface Adapter {
 }
 
 export interface AdapterData {
+  tenants?: TenantData[];
+  usersTenants?: UserTenantData[];
   passwordResets?: PasswordResetData[];
   users?: UserData[];
   roles?: RoleData[];

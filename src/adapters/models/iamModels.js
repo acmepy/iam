@@ -1,8 +1,12 @@
-export function defineIamModels({ define, DataTypes, tableNames = {}, references = false, associations = false }) {
+export function defineIamModels({ define, DataTypes, tableNames = {}, references = false, associations = false, tenant = false }) {
   const models = Object.fromEntries(
-    modelDefinitions.map((definition) => {
+    [...(tenant ? tenantDefinitions : []), ...modelDefinitions].map((definition) => {
       const tableName = tableNames[definition.name] ?? definition.tableName;
-      return [ definition.name, define(definition.name, mapAttributes(definition.attributes, DataTypes, references), { tableName, timestamps: true})];
+      const attributes = { ...definition.attributes };
+      if (tenant && ["users", "sessions"].includes(definition.name)) {
+        attributes.tenantId = { type: "integer", allowNull: true, references: { model: "tenants", key: "id" } };
+      }
+      return [ definition.name, define(definition.name, mapAttributes(attributes, DataTypes, references), { tableName, timestamps: true, tenant: false })];
     })
   );
 
@@ -31,7 +35,28 @@ function associateIamModels(models) {
   models.rolesPermissions.belongsTo(models.permissions, { foreignKey: "permissionId", as: "permission" });
 
   models.sessions.belongsTo(models.users, { foreignKey: "userId", as: "user" });
+  if (models.tenants && models.usersTenants) {
+    models.users.belongsTo(models.tenants, { foreignKey: "tenantId", as: "tenant" });
+    models.sessions.belongsTo(models.tenants, { foreignKey: "tenantId", as: "tenant" });
+    models.users.hasMany(models.usersTenants, { foreignKey: "userId", as: "usersTenants" });
+    models.tenants.hasMany(models.usersTenants, { foreignKey: "tenantId", as: "usersTenants" });
+    models.usersTenants.belongsTo(models.users, { foreignKey: "userId", as: "user" });
+    models.usersTenants.belongsTo(models.tenants, { foreignKey: "tenantId", as: "tenant" });
+  }
 }
+
+const tenantDefinitions = [
+  { name: "tenants", attributes: {
+    id: { type: "integer", primaryKey: true, autoIncrement: true },
+    name: { type: "string", length: 150, allowNull: false },
+    active: { type: "boolean", allowNull: false, defaultValue: true }
+  } },
+  { name: "usersTenants", attributes: {
+    userId: { type: "string", length: 100, primaryKey: true, allowNull: false, references: { model: "users", key: "id" } },
+    tenantId: { type: "integer", primaryKey: true, allowNull: false, references: { model: "tenants", key: "id" } },
+    active: { type: "boolean", allowNull: false, defaultValue: true }
+  } }
+];
 
 const modelDefinitions = [
   {

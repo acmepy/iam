@@ -10,7 +10,9 @@ export type {
   RolePermissionData,
   SessionData,
   UserData,
-  UserRoleData
+  UserRoleData,
+  TenantData,
+  UserTenantData
 } from "../types.js";
 
 import type {

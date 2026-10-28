@@ -3,10 +3,22 @@ import { createSessionId, now } from "../core/utils.js";
 import { defineIamModels } from "./models/iamModels.js";
 
 export class SequelizeAdapter {
-  constructor({ sequelize, models, tableNames } = {}) {
+  constructor({ sequelize, models, tableNames, tenant = false } = {}) {
     if (!sequelize && !models) throw new AdapterError("Sequelize o models son requeridos");
     this.sequelize = sequelize;
-    this.models = models ?? defineIamModels({define: sequelize.define.bind(sequelize), DataTypes: sequelize.Sequelize.DataTypes, tableNames, associations: true});
+    this.models = models ?? defineIamModels({define: sequelize.define.bind(sequelize), DataTypes: sequelize.Sequelize.DataTypes, tableNames, associations: true, tenant});
+  }
+
+  async findTenantById(id) {
+    if (!this.models.tenants) throw new AdapterError("Modelo tenants requerido: habilite tenant en SequelizeAdapter");
+    return normalize(await this.models.tenants.findByPk(id));
+  }
+
+  async findTenantsByUserId(userId) {
+    if (!this.models.usersTenants) throw new AdapterError("Modelo usersTenants requerido");
+    const assignments = await this.models.usersTenants.findAll({ where: { userId, active: true } });
+    const tenants = await Promise.all(assignments.map(item => this.findTenantById(readValue(item, "tenantId"))));
+    return tenants.filter(item => item && item.active !== false);
   }
 
   async findUserByUsername(username) {

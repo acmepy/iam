@@ -188,16 +188,16 @@ function normalizeLogging(logging = true, getContext) {
   const normalized = { getContext, target: logging };
   for (const level of levels) {
     const fallback = level === "error" ? console.error : console.log;
-    normalized[level] = logging[level] ?? fallback.bind(console);
+    normalized[level] = logging[level] ?? ((...args) => fallback.call(console, ...args.map(value => typeof value === "object" ? JSON.stringify(value) : value)));
   }
   return normalized;
 }
 
-function log(logging, level, path, message, details) {
+function log(logging, level, type, message, details) {
   const logger = logging?.[levels.has(level) ? level : "info"];
   if (typeof logger !== "function") return;
-  const txId = logging.getContext?.()?.txId || '';
-  logger.call(logging.target ?? logging, "[IAM]", `[${path}]`, txId, message, redact(details));
+  const txId = logging.getContext?.()?.txId ?? "";
+  logger.call(logging.target ?? logging, "[IAM]", txId, { type, message, ...redact(details) });
 }
 
 function redact(details) {

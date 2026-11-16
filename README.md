@@ -380,7 +380,7 @@ console.log(await rbac.can("admin", "users.list")); // true
 
 `auth` usa la misma convención de `logging` que `Seq`: por defecto registra eventos; usa `false` para desactivarlos o un objeto con handlers por nivel. Los eventos no incluyen contraseñas, tokens ni secretos.
 
-Cada handler recibe tres argumentos: `"[IAM]"`, el `txId` actual (o `""` si no existe) y un objeto con `type` (`"auth"` o `"can"`), `message` y los detalles del evento. El logger por defecto serializa ese objeto como JSON en una sola línea, por ejemplo: `[IAM] tx-123 {"type":"can","message":"Permiso concedido","userId":"R11","permission":"logs.list"}`.
+Cada handler recibe tres argumentos: `"[IAM]"`, el `txId` actual (o `""` si no existe) y un objeto con `type` (`"auth-operation"` o `"can-operation"`), `operation` (`"auth"` o `"can"`), `message` y los detalles del evento. El logger por defecto serializa ese objeto como JSON en una sola línea, por ejemplo: `[IAM] tx-123 {"userId":"R11","permission":"logs.list","type":"can-operation","operation":"can","message":"Permiso concedido"}`.
 
 La opción `getContext` de `auth` permite consultar el contexto actual de la aplicación: `auth({ adapter, getContext, logging: logger })`. Los logs incluyen `txId` cuando `getContext()?.txId` tiene un valor distinto de `null` o `undefined`. La función se consulta en cada evento y puede devolver otros datos de contexto; estos no se agregan al log.
 

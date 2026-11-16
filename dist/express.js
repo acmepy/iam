@@ -386,11 +386,11 @@ function normalizeLogging(logging = true, getContext) {
   return normalized;
 }
 
-function log(logging, level, type, message, details) {
+function log(logging, level, operation, message, details) {
   const logger = logging?.[levels.has(level) ? level : "info"];
   if (typeof logger !== "function") return;
   const txId = logging.getContext?.()?.txId ?? "";
-  logger.call(logging.target ?? logging, "[IAM]", txId, { type, message, ...redact(details) });
+  logger.call(logging.target ?? logging, "[IAM]", txId, { ...redact(details), type: `${operation}-operation`, operation, message });
 }
 
 function redact(details) {

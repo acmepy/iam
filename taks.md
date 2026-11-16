@@ -2,6 +2,10 @@
 
 Estados: [] pendiente, [X] completado.
 
+- [X] Separar los tipos de log auth-operation y can-operation conservando el formato y los tests existentes; 68 tests y build correctos.
+
+- [X] Unificar la categoría de logs en type iam y conservar auth/can como operation, sin modificar tests; 68 tests y build correctos.
+
 - [X] Extraer helpers de JWT, credenciales y sesiones de express/auth a core, conservando API y tests; 68 tests y build correctos.
 
 - [X] Mover accounts y tenants a core, conservando la API pública y los tests sin cambios; 68 tests y build correctos.

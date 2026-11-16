@@ -2,6 +2,12 @@
 
 Estados: [] pendiente, [X] completado.
 
+- [X] Extraer helpers de JWT, credenciales y sesiones de express/auth a core, conservando API y tests; 68 tests y build correctos.
+
+- [X] Mover accounts y tenants a core, conservando la API pública y los tests sin cambios; 68 tests y build correctos.
+
+- [X] Mover logging de express a core sin cambiar su comportamiento ni modificar los tests; 68 tests y build correctos.
+
 - [X] Estructurar los logs como etiqueta IAM, txId y objeto con type, message y detalles; emitir JSON en una línea con el logger por defecto. Verificado con 68 pruebas y build.
 
 - [X] Conservar el id del permiso en el include eager para evitar eliminar permisos distintos al deduplicar; test específico, 46 pruebas y build correctos.

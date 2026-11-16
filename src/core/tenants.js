@@ -1,5 +1,5 @@
-import { AdapterError, NotFoundError, RbacError, SessionRequiredError, ValidationError } from "../core/errors.js";
-import { publicUser } from "../core/utils.js";
+import { AdapterError, NotFoundError, RbacError, SessionRequiredError, ValidationError } from "./errors.js";
+import { publicUser } from "./utils.js";
 
 export function requireTenant(enabled) {
   if (!enabled) throw new RbacError("El soporte de tenants no esta habilitado", 400, "TENANT_DISABLED");
@@ -41,8 +41,7 @@ export function requireMethods(adapter, ...methods) {
 }
 
 function bodyFields(body, allowed) {
-  if (!body || typeof body !== "object" || Array.isArray(body)
-      || Object.keys(body).length !== 1 || !Object.hasOwn(body, allowed)) {
+  if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).length !== 1 || !Object.hasOwn(body, allowed)) {
     throw new ValidationError(`Indique solamente ${allowed}`);
   }
 }

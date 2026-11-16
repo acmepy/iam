@@ -1,10 +1,6 @@
-import {
-  ForbiddenError,
-  PermissionRequiredError,
-  SessionRequiredError
-} from "../core/errors.js";
+import {ForbiddenError, PermissionRequiredError, SessionRequiredError} from "../core/errors.js";
 import { getContext } from "./context.js";
-import { log } from "./logging.js";
+import { log } from "../core/logging.js";
 
 /**
  * Express authorization middleware for a single permission.

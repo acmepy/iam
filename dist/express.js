@@ -81,6 +81,60 @@ class ValidationError extends RbacError {
   }
 }
 
+const defaultExpiresIn = 365 * 24 * 60 * 60;
+
+async function signJwt(payload, secret, options = {}) {
+  if (!secret) throw new ValidationError("Secret requerido para JWT");
+
+  const jwt = new SignJWT(payload).setProtectedHeader({ alg: "HS256", typ: "JWT" });
+  const expiresIn = normalizeExpiresIn(options.expiresIn);
+
+  if (expiresIn) {
+    const issuedAt = Math.floor(Date.now() / 1000);
+    jwt.setIssuedAt(issuedAt).setExpirationTime(issuedAt + expiresIn);
+  }
+
+  return jwt.sign(createSecretKey(secret));
+}
+
+/**
+ * Verifies an HS256 JWT and returns its verified payload.
+ *
+ * @param {string} token
+ * @param {string} secret
+ * @returns {Promise<import("jose").JWTPayload>}
+ */
+async function verifyJwt(token, secret) {
+  try {
+    const { payload } = await jwtVerify(token, createSecretKey(secret), {algorithms: ["HS256"]});
+    return payload;
+  } catch {
+    throw new TokenInvalidError();
+  }
+}
+
+function normalizeExpiresIn(expiresIn) {
+  if (expiresIn === undefined || expiresIn === null) return defaultExpiresIn;
+
+  if (typeof expiresIn === "number" && Number.isFinite(expiresIn) && expiresIn > 0) return Math.floor(expiresIn);
+
+  if (typeof expiresIn === "string") {
+    const match = expiresIn.trim().match(/^(\d+)\s*([smhd])?$/i);
+    if (!match) throw new ValidationError("expiresIn JWT invalido");
+
+    const value = Number(match[1]);
+    const unit = match[2]?.toLowerCase() ?? "s";
+    const multipliers = { s: 1, m: 60, h: 3600, d: 86400 };
+    return value * multipliers[unit];
+  }
+
+  throw new ValidationError("expiresIn JWT invalido");
+}
+
+function createSecretKey(secret) {
+  return new TextEncoder().encode(secret);
+}
+
 function now() {
   return new Date();
 }
@@ -117,6 +171,145 @@ function ensureAdapter(adapter) {
   if (!adapter) {
     throw new AdapterError("Adapter requerido");
   }
+}
+
+function requireTenant(enabled) {
+  if (!enabled) throw new RbacError("El soporte de tenants no esta habilitado", 400, "TENANT_DISABLED");
+}
+
+function setTenantContext(getContext, tenantId) {
+  if (!getContext) return;
+  const context = getContext();
+  if (!context || typeof context !== "object" || Array.isArray(context)) {
+    throw new RbacError("No hay contexto de tenant para la peticion", 403, "TENANT_CONTEXT_MISSING");
+  }
+  context.tenantId = tenantId;
+}
+
+async function assertTenantAccess(adapter, userId, tenantId) {
+  if (tenantId === undefined || tenantId === null || tenantId === "") {
+    throw new RbacError("La sesion o el usuario no tiene tenantId", 403, "TENANT_REQUIRED");
+  }
+  if (!(typeof tenantId === "string" && tenantId.trim() && tenantId.length <= 100)
+      && !(typeof tenantId === "number" && Number.isSafeInteger(tenantId) && tenantId >= 0)) {
+    throw new RbacError("tenantId invalido", 400, "TENANT_INVALID");
+  }
+  requireMethods$1(adapter, "findTenantById", "findTenantsByUserId");
+  const tenant = await adapter.findTenantById(tenantId);
+  if (!tenant || tenant.active === false || tenant.id !== tenantId) {
+    throw new RbacError("El tenant no existe o esta inactivo", 403, "TENANT_UNAVAILABLE");
+  }
+  const allowed = await adapter.findTenantsByUserId(userId);
+  if (!allowed.some(item => item.id === tenantId && item.active !== false)) {
+    throw new RbacError("El usuario no tiene acceso al tenant solicitado", 403, "TENANT_FORBIDDEN");
+  }
+  return tenant;
+}
+
+function requireMethods$1(adapter, ...methods) {
+  for (const method of methods) {
+    if (typeof adapter[method] !== "function") throw new AdapterError(`Adapter requiere ${method}`);
+  }
+}
+
+function bodyFields$1(body, allowed) {
+  if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).length !== 1 || !Object.hasOwn(body, allowed)) {
+    throw new ValidationError(`Indique solamente ${allowed}`);
+  }
+}
+
+function preferences(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new ValidationError("options debe ser un objeto");
+  const inspect = item => {
+    if (!item || typeof item !== "object") return;
+    for (const [key, nested] of Object.entries(item)) {
+      if (["__proto__", "constructor", "prototype", "tenantId"].includes(key)) throw new ValidationError(`Opcion no permitida: ${key}`);
+      inspect(nested);
+    }
+  };
+  inspect(value);
+  return value;
+}
+
+/** Only edits the authenticated user's defaults or the current persisted session. */
+async function updateOwnSettings(adapter, session, body, { tenant, scope, field }) {
+  bodyFields$1(body, field);
+  if (field === "tenantId") {
+    requireTenant(tenant);
+    await assertTenantAccess(adapter, session.user.id, body.tenantId);
+  } else {
+    preferences(body.options);
+  }
+  const method = scope === "user" ? "updateUser" : "updateSession";
+  requireMethods$1(adapter, method);
+  if (scope === "session" && !session.id) throw new SessionRequiredError("El cambio requiere una sesion persistida");
+  const current = scope === "user" ? await adapter.findUserById(session.user.id) : await adapter.findSessionById(session.id);
+  if (!current) throw new NotFoundError();
+  const values = field === "options" ? { options: { ...current.options, ...body.options } } : { tenantId: body.tenantId };
+  const updated = await adapter[method](current.id, values);
+  if (!updated) throw new NotFoundError();
+  return scope === "user" ? publicUser(updated) : updated;
+}
+
+function sessionOptions(user, options = {}) {
+  return { ...(user?.options || {}), ...(options || {}) };
+}
+
+async function validateCredentials(adapter, username, password) {
+  if (!username || password === undefined) throw new AuthRequiredError();
+
+  const user = await adapter.findUserByUsername(username);
+  if (!user || user.active === false) throw new AuthError();
+
+  if (typeof adapter.verifyPassword === "function") {
+    const valid = await adapter.verifyPassword(user, password);
+    if (!valid) throw new AuthError();
+    return user;
+  }
+
+  if (user.password !== password) throw new AuthError();
+  return user;
+}
+
+async function createOrReuseSession(adapter, user, options, authOptions) {
+  const userId = user.id;
+  if (authOptions.createSession === false) return {id: null, userId, options, active: true};
+  if (typeof adapter.findActiveSessionByUserId === "function") {
+    const activeSession = await adapter.findActiveSessionByUserId(userId);
+    if (activeSession) return activeSession;
+  }
+  return createSession(adapter, user, options, authOptions);
+}
+
+async function createSession(adapter, user, options, authOptions) {
+  const userId = user.id;
+  if (authOptions.tenant) {
+    await assertTenantAccess(adapter, userId, user.tenantId);
+    setTenantContext(authOptions.getContext, user.tenantId);
+  }
+  if (authOptions.createSession === false) return {id: null, userId, options, active: true};
+  const date = now();
+  return adapter.createSession({id: createSessionId(), userId, ...(authOptions.tenant && { tenantId: user.tenantId }), token: null, options, active: true, createdAt: date, updatedAt: date});
+}
+
+async function getActivePublicSession(authCore, sessionId) {
+  if (!sessionId) throw new SessionRequiredError();
+  const session = await authCore.adapter.findSessionById(sessionId);
+  if (!session) throw new SessionRequiredError();
+  if (session.active === false) throw new SessionInactiveError();
+  const user = await authCore.adapter.findUserById(session.userId);
+  if (!user || user.active === false) throw new AuthError();
+  return createPublicSession(authCore, session, user);
+}
+
+async function createPublicSession(authCore, session, user) {
+  if (authCore.tenant) await assertTenantAccess(authCore.adapter, user.id, session.tenantId);
+  const permissions = await authCore.rbac.getPermissions(user.id);
+  return publicSession(session, user, {
+    permissions: Array.from(new Set(
+      permissions.filter((item) => item?.active !== false && item.permission).map((item) => item.permission)
+    ))
+  });
 }
 
 /**
@@ -208,13 +401,13 @@ function redact(details) {
   ]));
 }
 
-function requireMethods$1(adapter, ...methods) {
+function requireMethods(adapter, ...methods) {
   for (const method of methods) {
     if (typeof adapter?.[method] !== "function") throw new AdapterError(`Adapter requiere ${method}`);
   }
 }
 
-function bodyFields$1(body, allowed) {
+function bodyFields(body, allowed) {
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new ValidationError("Cuerpo requerido");
   if (Object.keys(body).some(key => !allowed.includes(key))) throw new ValidationError("Campo no permitido");
 }
@@ -237,16 +430,16 @@ function profileValues(body, required = false) {
 }
 
 async function register(adapter, body) {
-  requireMethods$1(adapter, "createUser");
-  bodyFields$1(body, ["name", "email", "password"]);
+  requireMethods(adapter, "createUser");
+  bodyFields(body, ["name", "email", "password"]);
   const values = profileValues(body, true);
   const password = passwordValue(body.password);
   return publicUser(await adapter.createUser({ id: randomUUID(), ...values, password, active: true, options: {} }));
 }
 
 async function updateProfile(adapter, userId, body) {
-  requireMethods$1(adapter, "updateUser");
-  bodyFields$1(body, ["name", "email"]);
+  requireMethods(adapter, "updateUser");
+  bodyFields(body, ["name", "email"]);
   const values = profileValues(body);
   if (!Object.keys(values).length) throw new ValidationError("Indique name o email");
   const user = await adapter.updateUser(userId, values);
@@ -255,8 +448,8 @@ async function updateProfile(adapter, userId, body) {
 }
 
 async function changePassword(adapter, userId, body) {
-  requireMethods$1(adapter, "changePassword");
-  bodyFields$1(body, ["currentPassword", "password"]);
+  requireMethods(adapter, "changePassword");
+  bodyFields(body, ["currentPassword", "password"]);
   const currentPassword = passwordValue(body.currentPassword);
   const password = passwordValue(body.password);
   const user = await adapter.findUserById(userId);
@@ -274,7 +467,7 @@ function tokenHash(token) {
 
 /** Server-only: the caller must authorize recovery for the exact userId. */
 async function createPasswordReset({ adapter, userId, resetUrl, expiresIn = 1800 } = {}) {
-  requireMethods$1(adapter, "findUserById", "createPasswordReset");
+  requireMethods(adapter, "findUserById", "createPasswordReset");
   if (!Number.isSafeInteger(expiresIn) || expiresIn <= 0) throw new ValidationError("expiresIn debe ser segundos positivos");
   let url;
   try { url = new URL(resetUrl); } catch { throw new ValidationError("resetUrl debe ser una URL absoluta"); }
@@ -289,94 +482,14 @@ async function createPasswordReset({ adapter, userId, resetUrl, expiresIn = 1800
 }
 
 async function resetPassword(adapter, body) {
-  requireMethods$1(adapter, "resetPassword");
-  bodyFields$1(body, ["token", "password"]);
+  requireMethods(adapter, "resetPassword");
+  bodyFields(body, ["token", "password"]);
   const password = passwordValue(body.password);
   if (typeof body.token !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(body.token)) throw new TokenInvalidError();
   if (!await adapter.resetPassword(tokenHash(body.token), password, Math.floor(Date.now() / 1000))) throw new TokenInvalidError();
 }
 
-function requireTenant(enabled) {
-  if (!enabled) throw new RbacError("El soporte de tenants no esta habilitado", 400, "TENANT_DISABLED");
-}
-
-function setTenantContext(getContext, tenantId) {
-  if (!getContext) return;
-  const context = getContext();
-  if (!context || typeof context !== "object" || Array.isArray(context)) {
-    throw new RbacError("No hay contexto de tenant para la peticion", 403, "TENANT_CONTEXT_MISSING");
-  }
-  context.tenantId = tenantId;
-}
-
-async function assertTenantAccess(adapter, userId, tenantId) {
-  if (tenantId === undefined || tenantId === null || tenantId === "") {
-    throw new RbacError("La sesion o el usuario no tiene tenantId", 403, "TENANT_REQUIRED");
-  }
-  if (!(typeof tenantId === "string" && tenantId.trim() && tenantId.length <= 100)
-      && !(typeof tenantId === "number" && Number.isSafeInteger(tenantId) && tenantId >= 0)) {
-    throw new RbacError("tenantId invalido", 400, "TENANT_INVALID");
-  }
-  requireMethods(adapter, "findTenantById", "findTenantsByUserId");
-  const tenant = await adapter.findTenantById(tenantId);
-  if (!tenant || tenant.active === false || tenant.id !== tenantId) {
-    throw new RbacError("El tenant no existe o esta inactivo", 403, "TENANT_UNAVAILABLE");
-  }
-  const allowed = await adapter.findTenantsByUserId(userId);
-  if (!allowed.some(item => item.id === tenantId && item.active !== false)) {
-    throw new RbacError("El usuario no tiene acceso al tenant solicitado", 403, "TENANT_FORBIDDEN");
-  }
-  return tenant;
-}
-
-function requireMethods(adapter, ...methods) {
-  for (const method of methods) {
-    if (typeof adapter[method] !== "function") throw new AdapterError(`Adapter requiere ${method}`);
-  }
-}
-
-function bodyFields(body, allowed) {
-  if (!body || typeof body !== "object" || Array.isArray(body)
-      || Object.keys(body).length !== 1 || !Object.hasOwn(body, allowed)) {
-    throw new ValidationError(`Indique solamente ${allowed}`);
-  }
-}
-
-function preferences(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new ValidationError("options debe ser un objeto");
-  const inspect = item => {
-    if (!item || typeof item !== "object") return;
-    for (const [key, nested] of Object.entries(item)) {
-      if (["__proto__", "constructor", "prototype", "tenantId"].includes(key)) throw new ValidationError(`Opcion no permitida: ${key}`);
-      inspect(nested);
-    }
-  };
-  inspect(value);
-  return value;
-}
-
-/** Only edits the authenticated user's defaults or the current persisted session. */
-async function updateOwnSettings(adapter, session, body, { tenant, scope, field }) {
-  bodyFields(body, field);
-  if (field === "tenantId") {
-    requireTenant(tenant);
-    await assertTenantAccess(adapter, session.user.id, body.tenantId);
-  } else {
-    preferences(body.options);
-  }
-  const method = scope === "user" ? "updateUser" : "updateSession";
-  requireMethods(adapter, method);
-  if (scope === "session" && !session.id) throw new SessionRequiredError("El cambio requiere una sesion persistida");
-  const current = scope === "user" ? await adapter.findUserById(session.user.id) : await adapter.findSessionById(session.id);
-  if (!current) throw new NotFoundError();
-  const values = field === "options" ? { options: { ...current.options, ...body.options } } : { tenantId: body.tenantId };
-  const updated = await adapter[method](current.id, values);
-  if (!updated) throw new NotFoundError();
-  return scope === "user" ? publicUser(updated) : updated;
-}
-
 const basicRealm = "IAM";
-const defaultExpiresIn = 365 * 24 * 60 * 60;
 
 /**
  * Express authentication middleware with built-in /login, /session and /logout.
@@ -390,7 +503,7 @@ function auth(options = {}) {
 
   if (options.tenant !== undefined && typeof options.tenant !== "boolean") throw new ValidationError("tenant debe ser booleano");
   if (options.tenant && options.createSession === false) throw new ValidationError("tenant requiere sesiones persistidas");
-  if (options.tenant) requireMethods(adapter, "findTenantById", "findTenantsByUserId");
+  if (options.tenant) requireMethods$1(adapter, "findTenantById", "findTenantsByUserId");
   const jwt = resolveJwtConfig(options);
   const rbac = new RBAC({ adapter });
   const authCore = { adapter, rbac, tenant: options.tenant === true, getContext: options.getContext, logging: normalizeLogging(options.logging, options.getContext) };
@@ -543,123 +656,14 @@ function credentialsFromBasicValue(value) {
   };
 }
 
-function sessionOptions(user, options = {}) {
-  return { ...(user?.options || {}), ...(options || {}) };
-}
-
-async function validateCredentials(adapter, username, password) {
-  if (!username || password === undefined) throw new AuthRequiredError();
-
-  const user = await adapter.findUserByUsername(username);
-  if (!user || user.active === false) throw new AuthError();
-
-  if (typeof adapter.verifyPassword === "function") {
-    const valid = await adapter.verifyPassword(user, password);
-    if (!valid) throw new AuthError();
-    return user;
-  }
-
-  if (user.password !== password) throw new AuthError();
-  return user;
-}
-
-async function createOrReuseSession(adapter, user, options, authOptions) {
-  const userId = user.id;
-  if (authOptions.createSession === false) return {id: null, userId, options, active: true};
-  if (typeof adapter.findActiveSessionByUserId === "function") {
-    const activeSession = await adapter.findActiveSessionByUserId(userId);
-    if (activeSession) return activeSession;
-  }
-  return createSession(adapter, user, options, authOptions);
-}
-
-async function createSession(adapter, user, options, authOptions) {
-  const userId = user.id;
-  if (authOptions.tenant) {
-    await assertTenantAccess(adapter, userId, user.tenantId);
-    setTenantContext(authOptions.getContext, user.tenantId);
-  }
-  if (authOptions.createSession === false) return {id: null, userId, options, active: true};
-  const date = now();
-  return adapter.createSession({id: createSessionId(), userId, ...(authOptions.tenant && { tenantId: user.tenantId }), token: null, options, active: true, createdAt: date, updatedAt: date});
-}
-
-async function getActivePublicSession(authCore, sessionId) {
-  if (!sessionId) throw new SessionRequiredError();
-  const session = await authCore.adapter.findSessionById(sessionId);
-  if (!session) throw new SessionRequiredError();
-  if (session.active === false) throw new SessionInactiveError();
-  const user = await authCore.adapter.findUserById(session.userId);
-  if (!user || user.active === false) throw new AuthError();
-  return createPublicSession(authCore, session, user);
-}
-
-async function createPublicSession(authCore, session, user) {
-  if (authCore.tenant) await assertTenantAccess(authCore.adapter, user.id, session.tenantId);
-  const permissions = await authCore.rbac.getPermissions(user.id);
-  return publicSession(session, user, {
-    permissions: Array.from(new Set(
-      permissions.filter((item) => item?.active !== false && item.permission).map((item) => item.permission)
-    ))
-  });
-}
-
 function attach(req, { authCore, rbac, session }) {
   req.session = session;
   if (authCore.tenant) setTenantContext(authCore.getContext, session.tenantId);
   setContext(req, { auth: authCore, adapter: authCore.adapter, rbac, session });
 }
 
-async function signJwt(payload, secret, options = {}) {
-  if (!secret) throw new ValidationError("Secret requerido para JWT");
-
-  const jwt = new SignJWT(payload).setProtectedHeader({ alg: "HS256", typ: "JWT" });
-  const expiresIn = normalizeExpiresIn(options.expiresIn);
-
-  if (expiresIn) {
-    const issuedAt = Math.floor(Date.now() / 1000);
-    jwt.setIssuedAt(issuedAt).setExpirationTime(issuedAt + expiresIn);
-  }
-
-  return jwt.sign(createSecretKey(secret));
-}
-
-/**
- * Verifies an HS256 JWT and returns its verified payload.
- *
- * @param {string} token
- * @param {string} secret
- * @returns {Promise<import("jose").JWTPayload>}
- */
-async function verifyJwt(token, secret) {
-  try {
-    const { payload } = await jwtVerify(token, createSecretKey(secret), {algorithms: ["HS256"]});
-    return payload;
-  } catch {
-    throw new TokenInvalidError();
-  }
-}
-
 function resolveJwtConfig(options) {
   return {secret: options.jwt?.secret, expiresIn: options.jwt?.expiresIn};
-}
-
-function normalizeExpiresIn(expiresIn) {
-  if (expiresIn === undefined || expiresIn === null) return defaultExpiresIn;
-
-  if (typeof expiresIn === "number" && Number.isFinite(expiresIn) && expiresIn > 0) return Math.floor(expiresIn);
-
-  if (typeof expiresIn === "string") {
-    const match = expiresIn.trim().match(/^(\d+)\s*([smhd])?$/i);
-    if (!match) throw new ValidationError("expiresIn JWT invalido");
-
-    const value = Number(match[1]);
-    const unit = match[2]?.toLowerCase() ?? "s";
-    const multipliers = { s: 1, m: 60, h: 3600, d: 86400 };
-    return value * multipliers[unit];
-  }
-
-  throw new ValidationError("expiresIn JWT invalido");
 }
 
 function matches(req, method, path) {
@@ -668,10 +672,6 @@ function matches(req, method, path) {
 
 function getPath(req) {
   return req.path ?? req.url?.split("?")[0] ?? "";
-}
-
-function createSecretKey(secret) {
-  return new TextEncoder().encode(secret);
 }
 
 function shouldChallenge(error, req) {

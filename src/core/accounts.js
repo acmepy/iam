@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { AdapterError, AuthError, NotFoundError, TokenInvalidError, ValidationError } from "../core/errors.js";
-import { publicUser } from "../core/utils.js";
+import { AdapterError, AuthError, NotFoundError, TokenInvalidError, ValidationError } from "./errors.js";
+import { publicUser } from "./utils.js";
 
 function requireMethods(adapter, ...methods) {
   for (const method of methods) {

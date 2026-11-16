@@ -1,24 +1,22 @@
-import { SignJWT, jwtVerify } from "jose";
+import { signJwt, verifyJwt, normalizeExpiresIn } from "../core/jwt.js";
+export { verifyJwt } from "../core/jwt.js";
+import { sessionOptions, validateCredentials, createOrReuseSession, createSession, getActivePublicSession, createPublicSession } from "../core/sessions.js";
 import { RBAC } from "../core/RBAC.js";
 import {
   AdapterError,
   AuthError,
   AuthRequiredError,
-  SessionInactiveError,
-  SessionRequiredError,
   TokenInvalidError,
   TokenRequiredError,
   ValidationError
 } from "../core/errors.js";
-import { createSessionId, now, publicSession } from "../core/utils.js";
 import { setContext } from "./context.js";
-import { log, normalizeLogging } from "./logging.js";
-import { register, updateProfile, changePassword, resetPassword } from "./accounts.js";
+import { log, normalizeLogging } from "../core/logging.js";
+import { register, updateProfile, changePassword, resetPassword } from "../core/accounts.js";
 
-import { assertTenantAccess, requireTenant, requireMethods, setTenantContext, updateOwnSettings } from "./tenants.js";
+import { requireTenant, requireMethods, setTenantContext, updateOwnSettings } from "../core/tenants.js";
 
 const basicRealm = "IAM";
-const defaultExpiresIn = 365 * 24 * 60 * 60;
 
 /**
  * Express authentication middleware with built-in /login, /session and /logout.
@@ -185,123 +183,14 @@ function credentialsFromBasicValue(value) {
   };
 }
 
-function sessionOptions(user, options = {}) {
-  return { ...(user?.options || {}), ...(options || {}) };
-}
-
-async function validateCredentials(adapter, username, password) {
-  if (!username || password === undefined) throw new AuthRequiredError();
-
-  const user = await adapter.findUserByUsername(username);
-  if (!user || user.active === false) throw new AuthError();
-
-  if (typeof adapter.verifyPassword === "function") {
-    const valid = await adapter.verifyPassword(user, password);
-    if (!valid) throw new AuthError();
-    return user;
-  }
-
-  if (user.password !== password) throw new AuthError();
-  return user;
-}
-
-async function createOrReuseSession(adapter, user, options, authOptions) {
-  const userId = user.id;
-  if (authOptions.createSession === false) return {id: null, userId, options, active: true};
-  if (typeof adapter.findActiveSessionByUserId === "function") {
-    const activeSession = await adapter.findActiveSessionByUserId(userId);
-    if (activeSession) return activeSession;
-  }
-  return createSession(adapter, user, options, authOptions);
-}
-
-async function createSession(adapter, user, options, authOptions) {
-  const userId = user.id;
-  if (authOptions.tenant) {
-    await assertTenantAccess(adapter, userId, user.tenantId);
-    setTenantContext(authOptions.getContext, user.tenantId);
-  }
-  if (authOptions.createSession === false) return {id: null, userId, options, active: true};
-  const date = now();
-  return adapter.createSession({id: createSessionId(), userId, ...(authOptions.tenant && { tenantId: user.tenantId }), token: null, options, active: true, createdAt: date, updatedAt: date});
-}
-
-async function getActivePublicSession(authCore, sessionId) {
-  if (!sessionId) throw new SessionRequiredError();
-  const session = await authCore.adapter.findSessionById(sessionId);
-  if (!session) throw new SessionRequiredError();
-  if (session.active === false) throw new SessionInactiveError();
-  const user = await authCore.adapter.findUserById(session.userId);
-  if (!user || user.active === false) throw new AuthError();
-  return createPublicSession(authCore, session, user);
-}
-
-async function createPublicSession(authCore, session, user) {
-  if (authCore.tenant) await assertTenantAccess(authCore.adapter, user.id, session.tenantId);
-  const permissions = await authCore.rbac.getPermissions(user.id);
-  return publicSession(session, user, {
-    permissions: Array.from(new Set(
-      permissions.filter((item) => item?.active !== false && item.permission).map((item) => item.permission)
-    ))
-  });
-}
-
 function attach(req, { authCore, rbac, session }) {
   req.session = session;
   if (authCore.tenant) setTenantContext(authCore.getContext, session.tenantId);
   setContext(req, { auth: authCore, adapter: authCore.adapter, rbac, session });
 }
 
-async function signJwt(payload, secret, options = {}) {
-  if (!secret) throw new ValidationError("Secret requerido para JWT");
-
-  const jwt = new SignJWT(payload).setProtectedHeader({ alg: "HS256", typ: "JWT" });
-  const expiresIn = normalizeExpiresIn(options.expiresIn);
-
-  if (expiresIn) {
-    const issuedAt = Math.floor(Date.now() / 1000);
-    jwt.setIssuedAt(issuedAt).setExpirationTime(issuedAt + expiresIn);
-  }
-
-  return jwt.sign(createSecretKey(secret));
-}
-
-/**
- * Verifies an HS256 JWT and returns its verified payload.
- *
- * @param {string} token
- * @param {string} secret
- * @returns {Promise<import("jose").JWTPayload>}
- */
-export async function verifyJwt(token, secret) {
-  try {
-    const { payload } = await jwtVerify(token, createSecretKey(secret), {algorithms: ["HS256"]});
-    return payload;
-  } catch {
-    throw new TokenInvalidError();
-  }
-}
-
 function resolveJwtConfig(options) {
   return {secret: options.jwt?.secret, expiresIn: options.jwt?.expiresIn};
-}
-
-function normalizeExpiresIn(expiresIn) {
-  if (expiresIn === undefined || expiresIn === null) return defaultExpiresIn;
-
-  if (typeof expiresIn === "number" && Number.isFinite(expiresIn) && expiresIn > 0) return Math.floor(expiresIn);
-
-  if (typeof expiresIn === "string") {
-    const match = expiresIn.trim().match(/^(\d+)\s*([smhd])?$/i);
-    if (!match) throw new ValidationError("expiresIn JWT invalido");
-
-    const value = Number(match[1]);
-    const unit = match[2]?.toLowerCase() ?? "s";
-    const multipliers = { s: 1, m: 60, h: 3600, d: 86400 };
-    return value * multipliers[unit];
-  }
-
-  throw new ValidationError("expiresIn JWT invalido");
 }
 
 function matches(req, method, path) {
@@ -310,10 +199,6 @@ function matches(req, method, path) {
 
 function getPath(req) {
   return req.path ?? req.url?.split("?")[0] ?? "";
-}
-
-function createSecretKey(secret) {
-  return new TextEncoder().encode(secret);
 }
 
 function shouldChallenge(error, req) {
